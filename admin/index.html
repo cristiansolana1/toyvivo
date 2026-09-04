@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panel de Aviso de vida</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section id="login-view" class="login-view">
+        <div class="brand-mark">AV</div>
+        <p class="eyebrow">Panel de supervisión</p>
+        <h1>Aviso de vida</h1>
+        <p class="intro">Consulta el estado general de los usuarios registrados.</p>
+        <form id="login-form" class="login-form">
+          <label>
+            Correo electrónico
+            <input id="email" type="email" autocomplete="email" required />
+          </label>
+          <label>
+            Contraseña
+            <input id="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit" class="primary-button">Iniciar sesión</button>
+          <p id="login-error" class="message error" role="alert"></p>
+        </form>
+      </section>
+
+      <section id="dashboard-view" class="dashboard-view" hidden>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Panel de supervisión</p>
+            <h1>Resumen de actividad</h1>
+          </div>
+          <div class="topbar-actions">
+            <button id="refresh-button" class="secondary-button" type="button">Actualizar</button>
+            <button id="logout-button" class="text-button" type="button">Cerrar sesión</button>
+          </div>
+        </header>
+
+        <p id="dashboard-message" class="message" role="status"></p>
+
+        <section class="metrics" aria-label="Indicadores principales">
+          <article class="metric-card">
+            <p class="metric-label">Usuarios registrados</p>
+            <p id="user-count" class="metric-value">-</p>
+            <p class="metric-detail">Perfiles disponibles en la aplicación</p>
+          </article>
+          <article class="latest-card">
+            <p class="metric-label">Último aviso de Estoy bien</p>
+            <div id="latest-user" class="latest-user">Cargando...</div>
+          </article>
+        </section>
+
+        <section class="survey-section" aria-labelledby="survey-heading">
+          <div>
+            <p class="eyebrow">Participación</p>
+            <h2 id="survey-heading">Crear encuesta</h2>
+            <p class="section-intro">Publica una pregunta para que los usuarios la respondan una sola vez.</p>
+          </div>
+          <form id="survey-form" class="survey-form">
+            <label>
+              Pregunta
+              <textarea id="survey-question" rows="3" required placeholder="Escribe la pregunta"></textarea>
+            </label>
+            <div id="survey-options" class="survey-options">
+              <label>Respuesta 1<input class="survey-option" type="text" required /></label>
+              <label>Respuesta 2<input class="survey-option" type="text" required /></label>
+            </div>
+            <div class="survey-actions">
+              <button id="add-option-button" class="secondary-button" type="button">Agregar respuesta</button>
+              <button class="primary-button" type="submit">Publicar encuesta</button>
+            </div>
+            <p id="survey-message" class="message" role="status"></p>
+          </form>
+        </section>
+
+        <section class="survey-results-section" aria-labelledby="survey-results-heading">
+          <div>
+            <p class="eyebrow">Resultados</p>
+            <h2 id="survey-results-heading">Encuestas realizadas</h2>
+            <p class="section-intro">Consulta cuántos usuarios eligieron cada respuesta.</p>
+          </div>
+          <div id="survey-results" class="survey-results-list">
+            <p class="message">Cargando encuestas...</p>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
