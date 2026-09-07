@@ -17,6 +17,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow get, list: if isSignedIn();
       allow create, update, delete: if isOwner(userId);
+      // Permitir consultas por DNI (publicProfile.dni y profile.dni)
+      allow list: if isSignedIn();
 
       match /heartbeats/{heartbeatId} {
         allow get, list: if isSignedIn();

@@ -13,16 +13,7 @@ import {
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAPIfQYG5mCdF1-4DFwWNyxQG2trHfFv24",
-  authDomain: "toyvivo-213f7.firebaseapp.com",
-  projectId: "toyvivo-213f7",
-  storageBucket: "toyvivo-213f7.firebasestorage.app",
-  messagingSenderId: "947221650406",
-  appId: "1:947221650406:web:8f922ef2a525830f9d1427",
-};
-
-const app = initializeApp(firebaseConfig);
+const app = initializeApp(window.FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const ADMIN_EMAIL = "cristiansolana1@gmail.com";

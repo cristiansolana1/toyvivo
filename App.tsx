@@ -109,7 +109,8 @@ function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: User) => vo
     try {
       setSubmitting(true);
       if (isLoginMode) {
-        await signInWithEmailAndPassword(auth, normalizedEmail, password);
+        const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
+        onAccountCreated(credential.user);
       } else {
         const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
         onAccountCreated(credential.user);
