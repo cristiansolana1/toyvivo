@@ -37,6 +37,60 @@ App/
 
 ---
 
+## Funcionalidades
+
+### App Móvil
+- **Autenticación**: Email/password con persistencia web (`browserLocalPersistence`)
+- **Perfil de usuario**: Nombre, DNI, teléfono (guardado local + Firestore)
+- **Avisos de vida (Heartbeats)**: Botón "Estoy bien" con cooldown 24h, guardado offline-first + sync nube
+- **Seguimiento contactos**: Agregar usuarios por DNI/UID, ver último aviso en tiempo real, llamar
+- **Encuestas**: Responder encuestas activas (una vez por usuario)
+- **Compartir app**: Native share dialog
+- **Soporte**: Enlace mailto predefinido
+
+### Panel Admin (`/admin`)
+- **Dashboard**: Total usuarios, último heartbeat
+- **Encuestas**: Crear con pregunta, 2-4 opciones
+- **Resultados encuestas**: Conteo por opción
+
+---
+
+## Modelo de Datos Firestore
+
+### `users/{uid}`
+```typescript
+{
+  publicProfile: { fullName, dni, phone },
+  emailNormalized: string,
+  lastAliveAt: Timestamp,
+  watchingUserIds: string[],  // UIDs o "dni:12345678"
+  profileUpdatedAt: Timestamp
+}
+```
+
+### `users/{uid}/heartbeats/{id}`
+```typescript
+{ status: "alive", createdAt: Timestamp, deviceCreatedAt: string }
+```
+
+### `surveys/{surveyId}`
+```typescript
+{
+  question: string,
+  options: string[],
+  active: boolean,
+  createdAt: Timestamp,
+  createdBy: string
+}
+```
+
+### `surveys/{surveyId}/responses/{uid}`
+```typescript
+{ answer: string, answeredAt: Timestamp }
+```
+
+---
+
 ## Requisitos Previos
 
 - Node.js 18+
@@ -83,12 +137,25 @@ firebase use toyvivo-213f7
 firebase deploy --only firestore:rules,firestore:indexes
 ```
 
-### 5. Ejecutar en desarrollo
+### 5. Panel Admin - Config local
+Crear `admin/firebase-config.js` (no se commitea):
+```javascript
+window.FIREBASE_CONFIG = {
+  apiKey: "TU_API_KEY",
+  authDomain: "toyvivo-213f7.firebaseapp.com",
+  projectId: "toyvivo-213f7",
+  storageBucket: "toyvivo-213f7.firebasestorage.app",
+  messagingSenderId: "947221650406",
+  appId: "1:947221650406:web:8f922ef2a525830f9d1427"
+};
+```
+
+### 6. Ejecutar en desarrollo
 ```bash
-# Mobile (Expo Go / Emulador / Web)
+# Terminal 1: Mobile (Expo Go / Emulador / Web)
 npx expo start
 
-# Admin panel (servidor estático local)
+# Terminal 2: Admin panel
 cd admin && npx serve .
 # Abre http://localhost:3000
 ```
@@ -106,20 +173,11 @@ eas build:configure
 
 ### Build de producción
 ```bash
-# Android (APK/AAB)
+# Android (AAB para Play Store)
 eas build --platform android --profile production
 
 # iOS (IPA - requiere cuenta Apple Developer)
 eas build --platform ios --profile production
-
-# Ambos
-eas build --platform all --profile production
-```
-
-### Build de preview / desarrollo
-```bash
-eas build --platform android --profile preview
-eas build --platform ios --profile preview
 ```
 
 ### Publicar en stores
@@ -131,28 +189,10 @@ eas submit --platform android --profile production
 eas submit --platform ios --profile production
 ```
 
-### Configuración `eas.json` (ejemplo)
-```json
-{
-  "cli": { "version": ">= 5.0.0" },
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal"
-    },
-    "preview": {
-      "distribution": "internal",
-      "android": { "buildType": "apk" }
-    },
-    "production": {
-      "android": { "buildType": "aab" },
-      "ios": { "buildType": "archive" }
-    }
-  },
-  "submit": {
-    "production": {}
-  }
-}
+### Variables de entorno en EAS (secrets)
+```bash
+eas secret:create --scope project --name EXPO_PUBLIC_FIREBASE_API_KEY --value "TU_API_KEY_PROD"
+# Repetir para cada EXPO_PUBLIC_*
 ```
 
 ---
@@ -174,22 +214,7 @@ firebase init hosting
 firebase deploy --only hosting
 ```
 
-URL resultante: `https://toyvivo-213f7.web.app` (o tu dominio personalizado)
-
-### Variables del panel admin
-El archivo `admin/firebase-config.js` se genera manualmente o en CI/CD con las mismas claves Firebase. **No commitear**.
-
-Ejemplo contenido:
-```javascript
-window.FIREBASE_CONFIG = {
-  apiKey: "TU_API_KEY",
-  authDomain: "toyvivo-213f7.firebaseapp.com",
-  projectId: "toyvivo-213f7",
-  storageBucket: "toyvivo-213f7.firebasestorage.app",
-  messagingSenderId: "947221650406",
-  appId: "1:947221650406:web:8f922ef2a525830f9d1427"
-};
-```
+URL resultante: `https://toyvivo-213f7.web.app` (o dominio personalizado)
 
 ---
 
@@ -258,16 +283,23 @@ firebase firestore:rules:get
 
 # Ver índices
 firebase firestore:indexes
+
+# Builds EAS
+eas build:list --platform android
+eas build:view <BUILD_ID>
+
+# Deploy solo reglas/índices
+firebase deploy --only firestore:rules,firestore:indexes
 ```
 
 ---
 
 ## Seguridad
 
-- **Nunca commitees** `.env`, `admin/firebase-config.js`
+- **Nunca commitees** `.env`, `admin/firebase-config.js`, `google-play-service-account.json`
 - Las claves en `.env` tienen prefijo `EXPO_PUBLIC_` → se incluyen en el bundle JS (necesario para Firebase Web SDK)
-- Restringe API Keys en Google Cloud Console: APIs > Credenciales > Restricciones de aplicación
-- Panel admin solo accesible para `cristiansolana1@gmail.com` (ver `admin/app.js:28`)
+- Restringe API Keys en Google Cloud Console: APIs > Credenciales > Restricciones de aplicación (agrega tus dominios + `localhost:3000`)
+- Panel admin solo accesible para `cristiansolana1@gmail.com` (ver `admin/app.js:24`)
 
 ---
 
