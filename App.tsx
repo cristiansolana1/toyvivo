@@ -301,6 +301,7 @@ function HomeScreen({
   useEffect(() => {
     async function loadSurvey() {
       const snapshot = await getDocs(collection(db, "surveys"));
+      const now = Date.now();
       const activeSurveys = snapshot.docs
         .map((surveyDoc) => {
           const data = surveyDoc.data();
@@ -310,9 +311,20 @@ function HomeScreen({
             question: data.question as string | undefined,
             options: data.options as unknown,
             createdAt: data.createdAt as { toMillis?: () => number } | undefined,
+            startAt: data.startAt as { toMillis?: () => number } | undefined,
+            endAt: data.endAt as { toMillis?: () => number } | undefined,
           };
         })
-        .filter((item) => item.active !== false && typeof item.question === "string" && Array.isArray(item.options))
+        .filter((item) => {
+          if (item.active === false) return false;
+          if (typeof item.question !== "string") return false;
+          if (!Array.isArray(item.options)) return false;
+          const start = item.startAt?.toMillis?.() ?? 0;
+          const end = item.endAt?.toMillis?.() ?? 0;
+          if (start && now < start) return false; // No iniciada
+          if (end && now > end) return false;     // Vencida
+          return true;
+        })
         .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
 
       let unansweredSurvey: (typeof activeSurveys)[number] | undefined;

@@ -64,6 +64,16 @@
               Pregunta
               <textarea id="survey-question" rows="3" required placeholder="Escribe la pregunta"></textarea>
             </label>
+            <div class="survey-datetime">
+              <label>
+                Inicio
+                <input id="survey-start" type="datetime-local" />
+              </label>
+              <label>
+                Fin
+                <input id="survey-end" type="datetime-local" />
+              </label>
+            </div>
             <div id="survey-options" class="survey-options">
               <label>Respuesta 1<input class="survey-option" type="text" required /></label>
               <label>Respuesta 2<input class="survey-option" type="text" required /></label>
@@ -88,6 +98,20 @@
         </section>
       </section>
     </main>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <h3 id="delete-modal-title">Eliminar encuesta</h3>
+        <p id="delete-modal-message">¿Estás seguro de que quieres eliminar esta encuesta? Se borrarán también todas sus respuestas. Esta acción no se puede deshacer.</p>
+        <div class="modal-actions">
+          <button id="delete-modal-cancel" class="secondary-button" type="button">Cancelar</button>
+          <button id="delete-modal-confirm" class="primary-button danger" type="button">Eliminar</button>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="./firebase-config.js"></script>
     <script type="module" src="./app.js"></script>
   </body>

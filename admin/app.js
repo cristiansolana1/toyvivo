@@ -11,6 +11,13 @@ import {
   getDocs,
   getFirestore,
   serverTimestamp,
+  query,
+  orderBy,
+  where,
+  updateDoc,
+  doc,
+  deleteDoc,
+  writeBatch,
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 const app = initializeApp(window.FIREBASE_CONFIG);
@@ -33,6 +40,16 @@ const addOptionButton = document.querySelector("#add-option-button");
 const surveyMessage = document.querySelector("#survey-message");
 const surveyResults = document.querySelector("#survey-results");
 
+// Survey datetime elements
+const surveyStart = document.querySelector("#survey-start");
+const surveyEnd = document.querySelector("#survey-end");
+
+// Delete modal elements
+const deleteModal = document.querySelector("#delete-modal");
+const deleteModalCancel = document.querySelector("#delete-modal-cancel");
+const deleteModalConfirm = document.querySelector("#delete-modal-confirm");
+const deleteModalMessage = document.querySelector("#delete-modal-message");
+
 function authMessage(error) {
   switch (error.code) {
     case "auth/api-key-not-valid.-please-pass-a-valid-api-key.":
@@ -54,6 +71,22 @@ function formatDate(timestamp) {
   return timestamp.toDate().toLocaleString("es-ES");
 }
 
+function formatDateTime(timestamp) {
+  if (!timestamp?.toDate) return "—";
+  return timestamp.toDate().toLocaleString("es-ES");
+}
+
+function getSurveyStatus(survey) {
+  const now = Date.now();
+  const start = survey.startAt?.toMillis?.() ?? 0;
+  const end = survey.endAt?.toMillis?.() ?? 0;
+  
+  if (!survey.active) return { text: "Desactivada", class: "status-inactive" };
+  if (start && now < start) return { text: "Programada", class: "status-never" };
+  if (end && now > end) return { text: "Finalizada", class: "status-inactive" };
+  return { text: "Activa", class: "status-active" };
+}
+
 async function loadSurveyResults() {
   const snapshot = await getDocs(collection(db, "surveys"));
   const surveys = await Promise.all(snapshot.docs.map(async (surveyDoc) => {
@@ -71,6 +104,10 @@ async function loadSurveyResults() {
     return {
       id: surveyDoc.id,
       question: data.question ?? "Encuesta sin pregunta",
+      options: data.options ?? [],
+      active: data.active ?? true,
+      startAt: data.startAt,
+      endAt: data.endAt,
       createdAt: data.createdAt,
       totalResponses: responsesSnapshot.size,
       counts: [...counts.entries()],
@@ -86,14 +123,56 @@ async function loadSurveyResults() {
   }
 
   surveys.forEach((survey) => {
+    const status = getSurveyStatus(survey);
     const card = document.createElement("article");
     card.className = "survey-result-card";
+    
     const heading = document.createElement("div");
     heading.className = "survey-result-heading";
-    heading.innerHTML = `<div><h3></h3><small></small></div><strong>${survey.totalResponses} respuesta${survey.totalResponses === 1 ? "" : "s"}</strong>`;
+    heading.innerHTML = `
+      <div>
+        <h3></h3>
+        <small></small>
+        <div class="survey-meta">
+          <span class="survey-status-badge ${status.class}">${status.text}</span>
+          ${survey.startAt ? `<span>Inicio: ${formatDateTime(survey.startAt)}</span>` : ""}
+          ${survey.endAt ? `<span>Fin: ${formatDateTime(survey.endAt)}</span>` : ""}
+        </div>
+      </div>
+      <strong>${survey.totalResponses} respuesta${survey.totalResponses === 1 ? "" : "s"}</strong>
+    `;
     heading.querySelector("h3").textContent = survey.question;
     heading.querySelector("small").textContent = formatDate(survey.createdAt);
     card.append(heading);
+
+    // Toggle active button
+    const actionsDiv = document.createElement("div");
+    actionsDiv.className = "survey-actions-row";
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = survey.active ? "secondary-button" : "text-button";
+    toggleBtn.textContent = survey.active ? "Desactivar" : "Activar";
+    toggleBtn.addEventListener("click", async () => {
+      try {
+        await updateDoc(doc(db, "surveys", survey.id), { active: !survey.active });
+        await loadSurveyResults();
+      } catch (error) {
+        console.error("Error toggling survey:", error);
+        alert("Error al cambiar estado: " + error.message);
+      }
+    });
+    actionsDiv.append(toggleBtn);
+
+    // Delete button
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "text-button danger";
+    deleteBtn.textContent = "Eliminar";
+    deleteBtn.style.marginLeft = "8px";
+    deleteBtn.addEventListener("click", () => openDeleteModal(survey));
+    actionsDiv.append(deleteBtn);
+
+    card.append(actionsDiv);
 
     const table = document.createElement("div");
     table.className = "results-table";
@@ -174,19 +253,31 @@ surveyForm.addEventListener("submit", async (event) => {
     .map((input) => input.value.trim())
     .filter(Boolean);
 
+  const startValue = surveyStart.value;
+  const endValue = surveyEnd.value;
+
   if (options.length < 2 || options.length > 4) {
     surveyMessage.textContent = "Agrega entre 2 y 4 respuestas.";
     return;
   }
 
+  const surveyData = {
+    question,
+    options,
+    active: true,
+    createdAt: serverTimestamp(),
+    createdBy: ADMIN_EMAIL,
+  };
+
+  if (startValue) {
+    surveyData.startAt = new Date(startValue);
+  }
+  if (endValue) {
+    surveyData.endAt = new Date(endValue);
+  }
+
   try {
-    await addDoc(collection(db, "surveys"), {
-      question,
-      options,
-      active: true,
-      createdAt: serverTimestamp(),
-      createdBy: ADMIN_EMAIL,
-    });
+    await addDoc(collection(db, "surveys"), surveyData);
     surveyForm.reset();
     surveyMessage.textContent = "Encuesta publicada correctamente.";
     await loadSurveyResults();
@@ -213,5 +304,65 @@ onAuthStateChanged(auth, async (user) => {
     } catch {
       dashboardMessage.textContent = "No se pudieron cargar los datos. Revisa los permisos de Firestore.";
     }
+  }
+});
+
+// ===== DELETE SURVEY MODAL =====
+let surveyToDelete = null;
+
+function openDeleteModal(survey) {
+  surveyToDelete = survey;
+  deleteModalMessage.textContent = `¿Eliminar "${survey.question}"? Se borrarán ${survey.totalResponses} respuesta${survey.totalResponses === 1 ? "" : "s"} y la encuesta. Esta acción no se puede deshacer.`;
+  deleteModal.hidden = false;
+  document.body.style.overflow = "hidden";
+}
+
+function closeDeleteModal() {
+  surveyToDelete = null;
+  deleteModal.hidden = true;
+  document.body.style.overflow = "";
+}
+
+async function confirmDeleteSurvey() {
+  if (!surveyToDelete) return;
+
+  deleteModalConfirm.disabled = true;
+  deleteModalConfirm.textContent = "Eliminando...";
+
+  try {
+    // Delete all responses in subcollection using batched writes
+    const responsesSnapshot = await getDocs(collection(db, "surveys", surveyToDelete.id, "responses"));
+    const batch = writeBatch(db);
+
+    responsesSnapshot.docs.forEach((responseDoc) => {
+      batch.delete(responseDoc.ref);
+    });
+
+    // Delete the survey document
+    batch.delete(doc(db, "surveys", surveyToDelete.id));
+
+    await batch.commit();
+
+    closeDeleteModal();
+    await loadSurveyResults();
+  } catch (error) {
+    console.error("Error deleting survey:", error);
+    alert("Error al eliminar: " + error.message);
+  } finally {
+    deleteModalConfirm.disabled = false;
+    deleteModalConfirm.textContent = "Eliminar";
+  }
+}
+
+deleteModalCancel.addEventListener("click", closeDeleteModal);
+deleteModalConfirm.addEventListener("click", confirmDeleteSurvey);
+
+// Close modal on backdrop click
+deleteModal.querySelector(".modal-backdrop").addEventListener("click", closeDeleteModal);
+
+// Close modal on Escape key
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !deleteModal.hidden) {
+    closeDeleteModal();
   }
 });
