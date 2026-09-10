@@ -191,22 +191,39 @@ async function loadSurveyResults() {
 
 async function loadDashboard() {
   dashboardMessage.textContent = "Actualizando datos...";
-  const snapshot = await getDocs(collection(db, "users"));
-  userCount.textContent = snapshot.size;
+  try {
+    const snapshot = await getDocs(collection(db, "users"));
+    console.log("[Admin] Users snapshot:", snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    
+    // Contar solo usuarios con perfil (publicProfile o profile)
+    const usersWithProfile = snapshot.docs.filter(doc => {
+      const data = doc.data();
+      return data.publicProfile || data.profile;
+    });
+    userCount.textContent = usersWithProfile.length;
 
-  const latest = snapshot.docs
-    .map((userDoc) => ({ id: userDoc.id, ...userDoc.data() }))
-    .filter((userData) => userData.lastAliveAt)
-    .sort((a, b) => b.lastAliveAt.toMillis() - a.lastAliveAt.toMillis())[0];
+    const latest = snapshot.docs
+      .map((userDoc) => ({ id: userDoc.id, ...userDoc.data() }))
+      .filter((userData) => userData.lastAliveAt)
+      .sort((a, b) => b.lastAliveAt.toMillis() - a.lastAliveAt.toMillis())[0];
 
-  if (!latest) {
-    latestUser.innerHTML = "Sin avisos registrados<small>Ningún usuario ha pulsado “Estoy bien” todavía.</small>";
-  } else {
-    const name = latest.publicProfile?.fullName ?? latest.profile?.fullName ?? "Usuario sin Cuenta";
-    latestUser.innerHTML = `${name}<small>${formatDate(latest.lastAliveAt)}</small>`;
+    if (!latest) {
+      latestUser.innerHTML = "Sin avisos registrados<small>Ningún usuario ha pulsado “Estoy bien” todavía.</small>";
+    } else {
+      const name = latest.publicProfile?.fullName ?? latest.profile?.fullName ?? "Usuario sin Cuenta";
+      latestUser.innerHTML = `${name}<small>${formatDate(latest.lastAliveAt)}</small>`;
+    }
+    await loadSurveyResults();
+    dashboardMessage.textContent = `Actualizado: ${new Date().toLocaleTimeString("es-ES")}`;
+  } catch (error) {
+    console.error("[Admin] Error loading dashboard:", error);
+    if (error.code === "permission-denied") {
+      dashboardMessage.textContent = "Sin permisos para leer usuarios. Revisa reglas de Firestore (necesita 'list' en collection users).";
+      userCount.textContent = "—";
+    } else {
+      dashboardMessage.textContent = `Error: ${error.message}`;
+    }
   }
-  await loadSurveyResults();
-  dashboardMessage.textContent = `Actualizado: ${new Date().toLocaleTimeString("es-ES")}`;
 }
 
 loginForm.addEventListener("submit", async (event) => {
