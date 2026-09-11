@@ -2,6 +2,8 @@ export type UserProfile = {
   fullName: string;
   dni: string;
   phone: string;
+  country: string;
+  province: string;
 };
 
 export type HeartbeatEntry = {
