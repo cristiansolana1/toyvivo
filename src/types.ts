@@ -4,6 +4,7 @@ export type UserProfile = {
   phone: string;
   country: string;
   province: string;
+  birthDate: string; // ISO string: YYYY-MM-DD
 };
 
 export type HeartbeatEntry = {

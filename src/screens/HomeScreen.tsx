@@ -39,6 +39,7 @@ export function HomeScreen({
   const [dni, setDni] = useState(profile.dni);
   const [phone, setPhone] = useState(profile.phone);
   const [province, setProvince] = useState(profile.province ?? "BA");
+  const [birthDate, setBirthDate] = useState(profile.birthDate ?? "");
   const [savingProfile, setSavingProfile] = useState(false);
   const [watchDni, setWatchDni] = useState("");
   const [watchingUserIds, setWatchingUserIds] = useState<string[]>([]);
@@ -62,6 +63,7 @@ export function HomeScreen({
     setDni(profile.dni);
     setPhone(profile.phone);
     setProvince(profile.province ?? "BA");
+    setBirthDate(profile.birthDate ?? "");
   }, [profile]);
 
   useEffect(() => {
@@ -366,10 +368,11 @@ export function HomeScreen({
       phone: phone.trim(),
       country: FIXED_COUNTRY,
       province,
+      birthDate,
     };
 
-    if (!updatedProfile.fullName || !updatedProfile.dni || !updatedProfile.phone || !updatedProfile.province) {
-      Alert.alert("Faltan datos", "Completa nombre, DNI, teléfono y provincia.");
+    if (!updatedProfile.fullName || !updatedProfile.dni || !updatedProfile.phone || !updatedProfile.province || !updatedProfile.birthDate) {
+      Alert.alert("Faltan datos", "Completa nombre, DNI, teléfono, provincia y fecha de nacimiento.");
       return;
     }
 
@@ -480,6 +483,17 @@ export function HomeScreen({
               <Picker.Item key={p.code} label={p.label} value={p.code} />
             ))}
           </Picker>
+          <Text style={styles.pickerLabel}>Fecha de nacimiento</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="YYYY-MM-DD"
+            value={birthDate}
+            onChangeText={(value) => {
+              const cleaned = value.replace(/[^0-9-]/g, "").slice(0, 10);
+              setBirthDate(cleaned);
+            }}
+            keyboardType="numeric"
+          />
           <Pressable style={styles.primaryButton} onPress={() => void handleSaveProfile()} disabled={savingProfile}>
             <Text style={styles.primaryButtonText}>{savingProfile ? "Guardando..." : "Guardar datos"}</Text>
           </Pressable>

@@ -61,7 +61,7 @@ export default function App() {
 
       const userDoc = await getDoc(doc(db, "users", currentUser.uid));
       const publicProfile = userDoc.data()?.publicProfile as
-        | Pick<UserProfile, "fullName" | "dni" | "phone" | "country" | "province">
+        | Pick<UserProfile, "fullName" | "dni" | "phone" | "country" | "province" | "birthDate">
         | undefined;
       const legacyProfile = userDoc.data()?.profile as UserProfile | undefined;
       const cloudProfile: UserProfile | null = publicProfile
@@ -71,6 +71,7 @@ export default function App() {
             phone: publicProfile.phone,
             country: publicProfile.country ?? "AR",
             province: publicProfile.province ?? "BA",
+            birthDate: publicProfile.birthDate ?? "",
           }
         : legacyProfile
           ? legacyProfile

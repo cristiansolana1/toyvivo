@@ -18,10 +18,11 @@ export function ProfileSetupScreen({
   const [dni, setDni] = useState("");
   const [phone, setPhone] = useState("");
   const [province, setProvince] = useState("BA");
+  const [birthDate, setBirthDate] = useState("");
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    if (!fullName || !dni || !phone || !province) {
+    if (!fullName || !dni || !phone || !province || !birthDate) {
       Alert.alert("Faltan datos", "Completa todos los campos.");
       return;
     }
@@ -32,6 +33,7 @@ export function ProfileSetupScreen({
       phone: phone.trim(),
       country: FIXED_COUNTRY,
       province,
+      birthDate,
     };
 
     try {
@@ -46,6 +48,7 @@ export function ProfileSetupScreen({
             phone: profile.phone,
             country: profile.country,
             province: profile.province,
+            birthDate: profile.birthDate,
           },
           emailNormalized: user.email?.toLowerCase() ?? "",
           profileUpdatedAt: serverTimestamp(),
@@ -93,6 +96,18 @@ export function ProfileSetupScreen({
           <Picker.Item key={p.code} label={p.label} value={p.code} />
         ))}
       </Picker>
+      <Text style={styles.pickerLabel}>Fecha de nacimiento</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="YYYY-MM-DD"
+        value={birthDate}
+        onChangeText={(value) => {
+          // Solo permitir números y guiones, máximo 10 caracteres (YYYY-MM-DD)
+          const cleaned = value.replace(/[^0-9-]/g, "").slice(0, 10);
+          setBirthDate(cleaned);
+        }}
+        keyboardType="numeric"
+      />
       <Pressable style={styles.primaryButton} onPress={handleSave} disabled={saving}>
         <Text style={styles.primaryButtonText}>{saving ? "Guardando..." : "Guardar datos"}</Text>
       </Pressable>
