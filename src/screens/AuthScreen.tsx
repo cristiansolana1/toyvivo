@@ -1,117 +1,21 @@
-import { useState } from "react";
-import { FirebaseError } from "firebase/app";
-import {
-  Alert,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import {
-  User,
-  createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
-} from "firebase/auth";
-import { auth } from "../firebase";
+import { SafeAreaView, ScrollView, StyleSheet, Text, Pressable } from "react-native";
+import { useAuth } from "../hooks/useAuth";
 
-export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: User) => void }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isLoginMode, setIsLoginMode] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [authNotice, setAuthNotice] = useState<string | null>(null);
-
-  const buttonLabel = isLoginMode ? "Iniciar sesión" : "Crear cuenta";
-
-  function getAuthErrorMessage(error: unknown): string {
-    if (!(error instanceof FirebaseError)) {
-      return "No se pudo continuar. Revisa los datos e intenta otra vez.";
-    }
-
-    switch (error.code) {
-      case "auth/invalid-email":
-        return "El correo no es valido.";
-      case "auth/missing-password":
-        return "La contrasena es obligatoria.";
-      case "auth/weak-password":
-        return "La contrasena debe tener al menos 6 caracteres.";
-      case "auth/email-already-in-use":
-        return "Este correo ya esta registrado.";
-      case "auth/user-not-found":
-        return "No existe una cuenta con este correo.";
-      case "auth/wrong-password":
-        return "La contraseña es incorrecta.";
-      case "auth/user-disabled":
-        return "Esta cuenta esta deshabilitada en Firebase.";
-      case "auth/operation-not-allowed":
-        return "Email/Password no esta habilitado en Firebase Authentication.";
-      case "auth/network-request-failed":
-        return "Error de red. Revisa tu conexion a internet.";
-      case "auth/invalid-api-key":
-        return "La API key de Firebase es invalida.";
-      case "auth/invalid-credential":
-      case "auth/invalid-login-credentials":
-        return "El correo o la contraseña no son validos.";
-      case "auth/too-many-requests":
-        return "Demasiados intentos. Espera unos minutos y vuelve a probar.";
-      default:
-        return `Error de Firebase: ${error.code}`;
-    }
-  }
-
-  const handleSubmit = async () => {
-    const normalizedEmail = email.trim();
-    setAuthError(null);
-    setAuthNotice(null);
-
-    if (!normalizedEmail || !password) {
-      setAuthError("Ingresa email y contraseña.");
-      return;
-    }
-
-    if (!isLoginMode && password.length < 6) {
-      setAuthError("La contraseña debe tener al menos 6 caracteres.");
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      if (isLoginMode) {
-        const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
-        onAccountCreated(credential.user);
-      } else {
-        const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
-        onAccountCreated(credential.user);
-      }
-    } catch (error) {
-      setAuthError(getAuthErrorMessage(error));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handlePasswordReset = async () => {
-    const normalizedEmail = email.trim();
-    setAuthError(null);
-    setAuthNotice(null);
-
-    if (!normalizedEmail) {
-      setAuthError("Escribe tu correo para recuperar la contraseña.");
-      return;
-    }
-
-    try {
-      await sendPasswordResetEmail(auth, normalizedEmail);
-      setAuthNotice("Te enviamos un enlace para cambiar la contraseña.");
-    } catch (error) {
-      setAuthError(getAuthErrorMessage(error));
-    }
-  };
+export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: any) => void }) {
+  const {
+    email,
+    setEmail,
+    password,
+    setPassword,
+    isLoginMode,
+    submitting,
+    authError,
+    authNotice,
+    buttonLabel,
+    handleSubmit,
+    handlePasswordReset,
+    toggleMode,
+  } = useAuth();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -138,17 +42,17 @@ export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: User
         {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
         {authNotice ? <Text style={styles.noticeText}>{authNotice}</Text> : null}
 
-        <Pressable style={styles.primaryButton} onPress={handleSubmit} disabled={submitting}>
+        <Pressable style={styles.primaryButton} onPress={() => handleSubmit(onAccountCreated)} disabled={submitting}>
           <Text style={styles.primaryButtonText}>{submitting ? "Procesando..." : buttonLabel}</Text>
         </Pressable>
 
-        <Pressable onPress={() => setIsLoginMode((prev) => !prev)}>
+        <Pressable onPress={toggleMode}>
           <Text style={styles.linkText}>
             {isLoginMode ? "¿No tienes cuenta? Crear cuenta" : "¿Ya tienes cuenta? Iniciar sesión"}
           </Text>
         </Pressable>
         {isLoginMode ? (
-          <Pressable onPress={() => void handlePasswordReset()}>
+          <Pressable onPress={handlePasswordReset}>
             <Text style={styles.resetText}>¿Olvidaste tu contraseña?</Text>
           </Pressable>
         ) : null}
@@ -156,6 +60,8 @@ export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: User
     </SafeAreaView>
   );
 }
+
+import { TextInput } from "react-native";
 
 const styles = StyleSheet.create({
   container: {

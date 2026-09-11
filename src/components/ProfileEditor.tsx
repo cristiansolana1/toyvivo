@@ -1,33 +1,25 @@
 import { useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { setDoc, doc, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase";
-import { saveUserProfile } from "../services/userService";
 import { UserProfile } from "../types";
 import { PROVINCES_AR, FIXED_COUNTRY, FIXED_COUNTRY_LABEL } from "../constants";
 
-export function ProfileSetupScreen({
-  user,
-  onSaved,
-}: {
-  user: any;
-  onSaved: (profile: UserProfile) => void;
-}) {
-  const [fullName, setFullName] = useState("");
-  const [dni, setDni] = useState("");
-  const [phone, setPhone] = useState("");
-  const [province, setProvince] = useState("BA");
-  const [birthDate, setBirthDate] = useState("");
-  const [saving, setSaving] = useState(false);
+interface ProfileEditorProps {
+  profile: UserProfile;
+  onSave: (profile: UserProfile) => void;
+  onCancel: () => void;
+  saving: boolean;
+}
 
-  const handleSave = async () => {
-    if (!fullName || !dni || !phone || !province || !birthDate) {
-      Alert.alert("Faltan datos", "Completa todos los campos.");
-      return;
-    }
+export function ProfileEditor({ profile, onSave, onCancel, saving }: ProfileEditorProps) {
+  const [fullName, setFullName] = useState(profile.fullName);
+  const [dni, setDni] = useState(profile.dni);
+  const [phone, setPhone] = useState(profile.phone);
+  const [province, setProvince] = useState(profile.province ?? "BA");
+  const [birthDate, setBirthDate] = useState(profile.birthDate ?? "");
 
-    const profile: UserProfile = {
+  const handleSave = () => {
+    const updatedProfile: UserProfile = {
       fullName: fullName.trim(),
       dni: dni.trim(),
       phone: phone.trim(),
@@ -36,52 +28,35 @@ export function ProfileSetupScreen({
       birthDate,
     };
 
-    try {
-      setSaving(true);
-      await saveUserProfile(user.uid, profile);
-      await setDoc(
-        doc(db, "users", user.uid),
-        {
-          publicProfile: {
-            fullName: profile.fullName,
-            dni: profile.dni,
-            phone: profile.phone,
-            country: profile.country,
-            province: profile.province,
-            birthDate: profile.birthDate,
-          },
-          emailNormalized: user.email?.toLowerCase() ?? "",
-          profileUpdatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-      onSaved(profile);
-    } catch (error) {
-      Alert.alert("Error", "No se pudieron guardar tus datos.");
-    } finally {
-      setSaving(false);
+    if (!updatedProfile.fullName || !updatedProfile.dni || !updatedProfile.phone || !updatedProfile.province || !updatedProfile.birthDate) {
+      Alert.alert("Faltan datos", "Completa nombre, DNI, teléfono, provincia y fecha de nacimiento.");
+      return;
     }
+
+    onSave(updatedProfile);
   };
 
   return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>Tus datos personales</Text>
-      <Text style={styles.subtitle}>Solo se solicita una vez.</Text>
-
-      <TextInput style={styles.input} placeholder="Nombre completo" value={fullName} onChangeText={setFullName} />
+    <View style={styles.editor}>
+      <TextInput
+        style={styles.input}
+        placeholder="Nombre completo"
+        value={fullName}
+        onChangeText={setFullName}
+      />
       <TextInput
         style={styles.input}
         placeholder="DNI"
         keyboardType="number-pad"
         value={dni}
-        onChangeText={setDni}
+        onChangeText={(value) => setDni(value.replace(/[^0-9]/g, ""))}
       />
       <TextInput
         style={styles.input}
         placeholder="Teléfono"
         keyboardType="phone-pad"
         value={phone}
-        onChangeText={setPhone}
+        onChangeText={(value) => setPhone(value.replace(/[^0-9]/g, ""))}
       />
       <Text style={styles.pickerLabel}>País</Text>
       <Text style={styles.fixedCountryText}>{FIXED_COUNTRY_LABEL}</Text>
@@ -110,25 +85,21 @@ export function ProfileSetupScreen({
       <Pressable style={styles.primaryButton} onPress={handleSave} disabled={saving}>
         <Text style={styles.primaryButtonText}>{saving ? "Guardando..." : "Guardar datos"}</Text>
       </Pressable>
+      <Pressable style={styles.cancelButton} onPress={onCancel}>
+        <Text style={styles.cancelButtonText}>Cancelar</Text>
+      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    paddingHorizontal: 24,
-    paddingVertical: 28,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#0f172a",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: "#334155",
+  editor: {
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 10,
+    padding: 14,
     marginBottom: 18,
+    backgroundColor: "#f1f5f9",
   },
   input: {
     borderWidth: 1,
@@ -177,10 +148,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     marginTop: 4,
-    marginBottom: 14,
+    marginBottom: 8,
   },
   primaryButtonText: {
     color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  cancelButton: {
+    backgroundColor: "#e2e8f0",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    color: "#0f172a",
     fontSize: 16,
     fontWeight: "600",
   },
