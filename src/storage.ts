@@ -4,6 +4,7 @@ import { HeartbeatEntry, UserProfile } from "./types";
 const profileKey = (uid: string) => `profile:${uid}`;
 const heartbeatHistoryKey = (uid: string) => `heartbeats:${uid}`;
 const lastHeartbeatKey = (uid: string) => `lastHeartbeat:${uid}`;
+const pendingHeartbeatsKey = (uid: string) => `pendingHeartbeats:${uid}`;
 
 export async function saveUserProfile(uid: string, profile: UserProfile) {
   await AsyncStorage.setItem(profileKey(uid), JSON.stringify(profile));
@@ -29,4 +30,27 @@ export async function saveHeartbeat(uid: string, heartbeat: HeartbeatEntry) {
 
 export async function loadLastHeartbeat(uid: string): Promise<string | null> {
   return AsyncStorage.getItem(lastHeartbeatKey(uid));
+}
+
+export async function addPendingHeartbeat(uid: string, heartbeat: HeartbeatEntry): Promise<void> {
+  const raw = await AsyncStorage.getItem(pendingHeartbeatsKey(uid));
+  const pending = raw ? (JSON.parse(raw) as HeartbeatEntry[]) : [];
+  pending.push(heartbeat);
+  await AsyncStorage.setItem(pendingHeartbeatsKey(uid), JSON.stringify(pending));
+}
+
+export async function getPendingHeartbeats(uid: string): Promise<HeartbeatEntry[]> {
+  const raw = await AsyncStorage.getItem(pendingHeartbeatsKey(uid));
+  return raw ? (JSON.parse(raw) as HeartbeatEntry[]) : [];
+}
+
+export async function clearPendingHeartbeats(uid: string): Promise<void> {
+  await AsyncStorage.removeItem(pendingHeartbeatsKey(uid));
+}
+
+export async function removePendingHeartbeat(uid: string, heartbeatId: string): Promise<void> {
+  const raw = await AsyncStorage.getItem(pendingHeartbeatsKey(uid));
+  const pending = raw ? (JSON.parse(raw) as HeartbeatEntry[]) : [];
+  const filtered = pending.filter((h) => h.id !== heartbeatId);
+  await AsyncStorage.setItem(pendingHeartbeatsKey(uid), JSON.stringify(filtered));
 }
