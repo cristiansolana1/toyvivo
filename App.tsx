@@ -7,13 +7,14 @@ import {
   Linking,
   Pressable,
   SafeAreaView,
-  Share,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 import {
   User,
   createUserWithEmailAndPassword,
@@ -26,6 +27,7 @@ import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, runTransac
 import { auth, db } from "./src/firebase";
 import { loadLastHeartbeat, loadUserProfile, saveHeartbeat, saveUserProfile } from "./src/storage";
 import { HeartbeatEntry, Survey, UserProfile, WatchedUserStatus } from "./src/types";
+import { PROVINCES_AR, FIXED_COUNTRY, FIXED_COUNTRY_LABEL, isHeartbeatOverdue, formatHeartbeatCountdown } from "./src/constants";
 
 function getAuthErrorMessage(error: unknown): string {
   if (!(error instanceof FirebaseError)) {
@@ -64,21 +66,27 @@ function getAuthErrorMessage(error: unknown): string {
   }
 }
 
-const HEARTBEAT_LIMIT_MS = 24 * 60 * 60 * 1000;
-
-function isHeartbeatOverdue(lastHeartbeat: string | null, now = Date.now()): boolean {
-  return !lastHeartbeat || now - new Date(lastHeartbeat).getTime() >= HEARTBEAT_LIMIT_MS;
+function toISODate(ddmmyyyy: string): string {
+  const cleaned = ddmmyyyy.replace(/[^0-9]/g, "");
+  if (cleaned.length !== 8) return "";
+  const day = cleaned.slice(0, 2);
+  const month = cleaned.slice(2, 4);
+  const year = cleaned.slice(4, 8);
+  return `${year}-${month}-${day}`;
 }
 
-function formatHeartbeatCountdown(lastHeartbeat: string | null, now = Date.now()): string {
-  if (!lastHeartbeat) {
-    return "Estoy bien";
-  }
+function toDDMMYYYY(isoDate: string): string {
+  if (!isoDate) return "";
+  const parts = isoDate.split("-");
+  if (parts.length !== 3) return "";
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
 
-  const remainingMs = Math.max(0, HEARTBEAT_LIMIT_MS - (now - new Date(lastHeartbeat).getTime()));
-  const remainingHours = Math.floor(remainingMs / (60 * 60 * 1000));
-  const remainingMinutes = Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
-  return `Disponible en ${remainingHours}h ${remainingMinutes.toString().padStart(2, "0")}m`;
+function formatBirthDateInput(value: string): string {
+  const cleaned = value.replace(/[^0-9]/g, "");
+  if (cleaned.length <= 2) return cleaned;
+  if (cleaned.length <= 4) return `${cleaned.slice(0, 2)}/${cleaned.slice(2)}`;
+  return `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}/${cleaned.slice(4, 8)}`;
 }
 
 function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: User) => void }) {
@@ -192,10 +200,12 @@ function ProfileSetupScreen({
   const [fullName, setFullName] = useState("");
   const [dni, setDni] = useState("");
   const [phone, setPhone] = useState("");
+  const [province, setProvince] = useState("BA");
+  const [birthDate, setBirthDate] = useState("");
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    if (!fullName || !dni || !phone) {
+    if (!fullName || !dni || !phone || !province || !birthDate) {
       Alert.alert("Faltan datos", "Completa todos los campos.");
       return;
     }
@@ -204,6 +214,9 @@ function ProfileSetupScreen({
       fullName: fullName.trim(),
       dni: dni.trim(),
       phone: phone.trim(),
+      country: FIXED_COUNTRY,
+      province,
+      birthDate,
     };
 
     try {
@@ -216,6 +229,9 @@ function ProfileSetupScreen({
             fullName: profile.fullName,
             dni: profile.dni,
             phone: profile.phone,
+            country: profile.country,
+            province: profile.province,
+            birthDate: profile.birthDate,
           },
           emailNormalized: user.email?.toLowerCase() ?? "",
           profileUpdatedAt: serverTimestamp(),
@@ -250,6 +266,31 @@ function ProfileSetupScreen({
         value={phone}
         onChangeText={setPhone}
       />
+      <Text style={styles.pickerLabel}>País</Text>
+      <Text style={styles.fixedCountryText}>{FIXED_COUNTRY_LABEL}</Text>
+      <Text style={styles.pickerLabel}>Provincia</Text>
+      <Picker
+        style={styles.picker}
+        selectedValue={province}
+        onValueChange={setProvince}
+        itemStyle={styles.pickerItem}
+      >
+        {PROVINCES_AR.map((p) => (
+          <Picker.Item key={p.code} label={p.label} value={p.code} />
+        ))}
+      </Picker>
+      <Text style={styles.pickerLabel}>Fecha de nacimiento</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="DD/MM/AAAA"
+        value={toDDMMYYYY(birthDate)}
+        onChangeText={(value) => {
+          const formatted = formatBirthDateInput(value);
+          setBirthDate(toISODate(formatted));
+        }}
+        keyboardType="numeric"
+        maxLength={10}
+      />
       <Pressable style={styles.primaryButton} onPress={handleSave} disabled={saving}>
         <Text style={styles.primaryButtonText}>{saving ? "Guardando..." : "Guardar datos"}</Text>
       </Pressable>
@@ -274,6 +315,8 @@ function HomeScreen({
   const [fullName, setFullName] = useState(profile.fullName);
   const [dni, setDni] = useState(profile.dni);
   const [phone, setPhone] = useState(profile.phone);
+  const [province, setProvince] = useState(profile.province ?? "BA");
+  const [birthDate, setBirthDate] = useState(profile.birthDate ?? "");
   const [savingProfile, setSavingProfile] = useState(false);
   const [watchDni, setWatchDni] = useState("");
   const [watchingUserIds, setWatchingUserIds] = useState<string[]>([]);
@@ -296,6 +339,8 @@ function HomeScreen({
     setFullName(profile.fullName);
     setDni(profile.dni);
     setPhone(profile.phone);
+    setProvince(profile.province ?? "BA");
+    setBirthDate(profile.birthDate ?? "");
   }, [profile]);
 
   useEffect(() => {
@@ -599,10 +644,13 @@ function HomeScreen({
       fullName: fullName.trim(),
       dni: dni.trim(),
       phone: phone.trim(),
+      country: FIXED_COUNTRY,
+      province,
+      birthDate,
     };
 
-    if (!updatedProfile.fullName || !updatedProfile.dni || !updatedProfile.phone) {
-      Alert.alert("Faltan datos", "Completa nombre, DNI y teléfono.");
+    if (!updatedProfile.fullName || !updatedProfile.dni || !updatedProfile.phone || !updatedProfile.province || !updatedProfile.birthDate) {
+      Alert.alert("Faltan datos", "Completa nombre, DNI, teléfono, provincia y fecha de nacimiento.");
       return;
     }
 
@@ -713,6 +761,31 @@ function HomeScreen({
             keyboardType="phone-pad"
             value={phone}
             onChangeText={(value) => setPhone(value.replace(/[^0-9]/g, ""))}
+          />
+          <Text style={styles.pickerLabel}>País</Text>
+          <Text style={styles.fixedCountryText}>{FIXED_COUNTRY_LABEL}</Text>
+          <Text style={styles.pickerLabel}>Provincia</Text>
+          <Picker
+            style={styles.picker}
+            selectedValue={province}
+            onValueChange={setProvince}
+            itemStyle={styles.pickerItem}
+          >
+            {PROVINCES_AR.map((p) => (
+              <Picker.Item key={p.code} label={p.label} value={p.code} />
+            ))}
+          </Picker>
+          <Text style={styles.pickerLabel}>Fecha de nacimiento</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="DD/MM/AAAA"
+            value={toDDMMYYYY(birthDate)}
+            onChangeText={(value) => {
+              const formatted = formatBirthDateInput(value);
+              setBirthDate(toISODate(formatted));
+            }}
+            keyboardType="numeric"
+            maxLength={10}
           />
           <Pressable style={styles.primaryButton} onPress={() => void handleSaveProfile()} disabled={savingProfile}>
             <Text style={styles.primaryButtonText}>{savingProfile ? "Guardando..." : "Guardar datos"}</Text>
@@ -862,7 +935,7 @@ export default function App() {
 
       const userDoc = await getDoc(doc(db, "users", currentUser.uid));
       const publicProfile = userDoc.data()?.publicProfile as
-        | Pick<UserProfile, "fullName" | "dni" | "phone">
+        | Pick<UserProfile, "fullName" | "dni" | "phone" | "country" | "province" | "birthDate">
         | undefined;
       const legacyProfile = userDoc.data()?.profile as UserProfile | undefined;
       const cloudProfile: UserProfile | null = publicProfile
@@ -870,6 +943,9 @@ export default function App() {
             fullName: publicProfile.fullName,
             dni: publicProfile.dni,
             phone: publicProfile.phone,
+            country: publicProfile.country ?? FIXED_COUNTRY,
+            province: publicProfile.province ?? "BA",
+            birthDate: publicProfile.birthDate ?? "",
           }
         : legacyProfile
           ? legacyProfile
@@ -1155,5 +1231,36 @@ const styles = StyleSheet.create({
   removeText: {
     color: "#dc2626",
     fontWeight: "700",
+  },
+  pickerLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#334155",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  picker: {
+    height: 50,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+  },
+  pickerItem: {
+    fontSize: 16,
+    color: "#0f172a",
+  },
+  fixedCountryText: {
+    fontSize: 16,
+    color: "#0f172a",
+    fontWeight: "600",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 10,
+    marginBottom: 12,
   },
 });

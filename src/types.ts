@@ -2,6 +2,9 @@ export type UserProfile = {
   fullName: string;
   dni: string;
   phone: string;
+  country: string;
+  province: string;
+  birthDate: string; // ISO string: YYYY-MM-DD
 };
 
 export type HeartbeatEntry = {
