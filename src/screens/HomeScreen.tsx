@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View, ActivityIndicator } from "react-native";
+import { Alert, Linking, RefreshControl, Pressable, ScrollView, Share, StyleSheet, Text, View, ActivityIndicator } from "react-native";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 import { useWatchedUsers } from "../hooks/useWatchedUsers";
 import { useSurvey } from "../hooks/useSurvey";
@@ -10,6 +10,9 @@ import { ProfileEditor } from "../components/ProfileEditor";
 import { SurveyCard } from "../components/SurveyCard";
 import { AddUserForm } from "../components/AddUserForm";
 import { isHeartbeatOverdue, formatHeartbeatCountdown, FIXED_COUNTRY_LABEL, PROVINCES_AR } from "../constants";
+import { getWatchedUsersStatus, getWatchingUserIds } from "../services/userService";
+import { User } from "firebase/auth";
+import { UserProfile } from "../types";
 
 export function HomeScreen({
   user,
@@ -17,11 +20,13 @@ export function HomeScreen({
   onProfileUpdated,
   onSignOut,
 }: {
-  user: any;
-  profile: any;
-  onProfileUpdated: (profile: any) => void;
+  user: User | null;
+  profile: UserProfile | null;
+  onProfileUpdated: (profile: UserProfile) => void;
   onSignOut: () => Promise<void>;
 }) {
+  if (!user) return null;
+
   const {
     lastHeartbeat,
     sending,
@@ -55,10 +60,17 @@ export function HomeScreen({
     handleSurveySubmit,
   } = useSurvey(user.uid);
 
-  const { profile: currentProfile, loading, saving, saveProfile } = useProfile(user.uid, profile);
+  const { profile: currentProfile, loading, saving, saveProfile } = useProfile(user.uid, profile ?? undefined) as {
+    profile: UserProfile | null;
+    loading: boolean;
+    saving: boolean;
+    saveProfile: (profile: UserProfile) => Promise<boolean>;
+    setProfile: (profile: UserProfile | null) => void;
+  };
 
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [watchDni, setWatchDni] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   const sortedWatchedUsers = useMemo(() => {
     return [...watchedUsers].sort((a, b) => {
@@ -113,7 +125,23 @@ export function HomeScreen({
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.screen}>
+    <ScrollView
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={async () => {
+          setRefreshing(true);
+          try {
+            await syncPending();
+            // The useWatchedUsers hook already subscribes to real-time updates,
+            // so watched users will update automatically.
+          } finally {
+            setRefreshing(false);
+          }
+        }}
+        />
+      }
+      contentContainerStyle={styles.screen}>
       <View style={styles.topMenuRow}>
         <Pressable style={styles.profileMenuButton} onPress={() => setShowProfileEditor((previous) => !previous)}>
           <Text style={styles.profileMenuButtonText}>
@@ -130,7 +158,7 @@ export function HomeScreen({
         />
       ) : null}
 
-      <Text style={styles.title}>Hola, {currentProfile?.fullName ?? profile.fullName}</Text>
+      <Text style={styles.title}>Hola, {profile?.fullName ?? user?.email?.split("@")[0] ?? "Invitado"}</Text>
       <Text style={[styles.subtitle, overdue && styles.overdueText]}>
         Último aviso: {formattedLastHeartbeat}
       </Text>

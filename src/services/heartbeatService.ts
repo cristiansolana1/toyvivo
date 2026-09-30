@@ -29,6 +29,7 @@ export async function sendHeartbeat(uid: string, heartbeat: HeartbeatEntry): Pro
     );
     return { success: true, queued: false };
   } catch (error) {
+    console.error("sendHeartbeat error:", error);
     await addPendingHeartbeat(uid, heartbeat);
     return { success: false, queued: true };
   }
@@ -58,7 +59,8 @@ export async function syncPendingHeartbeats(uid: string): Promise<{ synced: numb
       );
       await removePendingHeartbeat(uid, heartbeat.id);
       synced++;
-    } catch {
+    } catch (error) {
+      console.error("syncPendingHeartbeat failed:", error);
       failed++;
     }
   }
