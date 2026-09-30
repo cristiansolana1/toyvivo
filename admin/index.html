@@ -28,74 +28,224 @@
       </section>
 
       <section id="dashboard-view" class="dashboard-view" hidden>
-        <header class="topbar">
-          <div>
-            <p class="eyebrow">Panel de supervisión</p>
-            <h1>Resumen de actividad</h1>
+        <aside class="sidebar" id="sidebar">
+          <nav class="sidebar-nav" role="navigation" aria-label="Navegación principal">
+            <a href="#" class="sidebar-link active" data-view="dashboard" role="button">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+              <span>Resumen</span>
+            </a>
+            <a href="#" class="sidebar-link" data-view="users" role="button">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <span>Usuarios</span>
+              <span class="sidebar-badge" id="users-badge">0</span>
+            </a>
+            <a href="#" class="sidebar-link" data-view="surveys" role="button">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+              <span>Encuestas</span>
+              <span class="sidebar-badge" id="surveys-badge">0</span>
+            </a>
+            <a href="#" class="sidebar-link" data-view="results" role="button">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+              <span>Resultados</span>
+            </a>
+          </nav>
+          <div class="sidebar-footer">
+            <button id="logout-button" class="sidebar-link text-button" type="button">
+              <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              <span>Cerrar sesión</span>
+            </button>
           </div>
-          <div class="topbar-actions">
-            <button id="refresh-button" class="secondary-button" type="button">Actualizar</button>
-            <button id="logout-button" class="text-button" type="button">Cerrar sesión</button>
-          </div>
-        </header>
-
-        <p id="dashboard-message" class="message" role="status"></p>
-
-        <section class="metrics" aria-label="Indicadores principales">
-          <article class="metric-card">
-            <p class="metric-label">Usuarios registrados</p>
-            <p id="user-count" class="metric-value">-</p>
-            <p class="metric-detail">Perfiles disponibles en la aplicación</p>
-          </article>
-          <article class="latest-card">
-            <p class="metric-label">Último aviso de Estoy bien</p>
-            <div id="latest-user" class="latest-user">Cargando...</div>
-          </article>
-        </section>
-
-        <section class="survey-section" aria-labelledby="survey-heading">
-          <div>
-            <p class="eyebrow">Participación</p>
-            <h2 id="survey-heading">Crear encuesta</h2>
-            <p class="section-intro">Publica una pregunta para que los usuarios la respondan una sola vez.</p>
-          </div>
-          <form id="survey-form" class="survey-form">
-            <label>
-              Pregunta
-              <textarea id="survey-question" rows="3" required placeholder="Escribe la pregunta"></textarea>
-            </label>
-            <div class="survey-datetime">
-              <label>
-                Inicio
-                <input id="survey-start" type="datetime-local" />
-              </label>
-              <label>
-                Fin
-                <input id="survey-end" type="datetime-local" />
-              </label>
+        </aside>
+        <div class="main-content">
+          <header class="topbar">
+            <div>
+              <p class="eyebrow" id="view-title">Resumen de actividad</p>
+              <h1 id="view-subtitle">Panel de supervisión</h1>
             </div>
-            <div id="survey-options" class="survey-options">
-              <label>Respuesta 1<input class="survey-option" type="text" required /></label>
-              <label>Respuesta 2<input class="survey-option" type="text" required /></label>
+            <div class="topbar-actions">
+              <button id="refresh-button" class="secondary-button" type="button" aria-label="Actualizar datos">Actualizar</button>
             </div>
-            <div class="survey-actions">
-              <button id="add-option-button" class="secondary-button" type="button">Agregar respuesta</button>
-              <button class="primary-button" type="submit">Publicar encuesta</button>
-            </div>
-            <p id="survey-message" class="message" role="status"></p>
-          </form>
-        </section>
+          </header>
 
-        <section class="survey-results-section" aria-labelledby="survey-results-heading">
-          <div>
-            <p class="eyebrow">Resultados</p>
-            <h2 id="survey-results-heading">Encuestas realizadas</h2>
-            <p class="section-intro">Consulta cuántos usuarios eligieron cada respuesta.</p>
+          <p id="dashboard-message" class="message" role="status"></p>
+
+          <!-- DASHBOARD VIEW -->
+          <div id="view-dashboard" class="view-content">
+            <section class="metrics" aria-label="Indicadores principales">
+              <article class="metric-card">
+                <p class="metric-label">Usuarios registrados</p>
+                <p id="user-count" class="metric-value">-</p>
+                <p class="metric-detail">Perfiles disponibles en la aplicación</p>
+              </article>
+              <article class="latest-card">
+                <p class="metric-label">Último aviso de Estoy bien</p>
+                <div id="latest-user" class="latest-user">Cargando...</div>
+              </article>
+            </section>
+
+            <section class="survey-section" aria-labelledby="survey-heading">
+              <div>
+                <p class="eyebrow">Participación</p>
+                <h2 id="survey-heading">Crear encuesta</h2>
+                <p class="section-intro">Publica una pregunta para que los usuarios la respondan una sola vez.</p>
+              </div>
+              <form id="survey-form" class="survey-form">
+                <label>
+                  Pregunta
+                  <textarea id="survey-question" rows="3" required placeholder="Escribe la pregunta"></textarea>
+                </label>
+                <div class="survey-datetime">
+                  <label class="datetime-picker-wrapper">
+                    <span>Inicio</span>
+                    <div class="datetime-picker" id="survey-start-picker">
+                      <input type="hidden" id="survey-start" />
+                      <button type="button" class="datetime-picker-trigger" aria-label="Seleccionar fecha y hora">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        <span class="datetime-picker-display">Seleccionar</span>
+                      </button>
+                    </div>
+                  </label>
+                  <label class="datetime-picker-wrapper">
+                    <span>Fin</span>
+                    <div class="datetime-picker" id="survey-end-picker">
+                      <input type="hidden" id="survey-end" />
+                      <button type="button" class="datetime-picker-trigger" aria-label="Seleccionar fecha y hora">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        <span class="datetime-picker-display">Seleccionar</span>
+                      </button>
+                    </div>
+                  </label>
+                </div>
+                <div id="survey-options" class="survey-options">
+                  <label>Respuesta 1<input class="survey-option" type="text" required /></label>
+                  <label>Respuesta 2<input class="survey-option" type="text" required /></label>
+                </div>
+                <div class="survey-actions">
+                  <button id="add-option-button" class="secondary-button" type="button">Agregar respuesta</button>
+                  <button class="primary-button" type="submit">Publicar encuesta</button>
+                </div>
+                <p id="survey-message" class="message" role="status"></p>
+              </form>
+            </section>
+
+            <section class="survey-results-section" aria-labelledby="survey-results-heading">
+              <div>
+                <p class="eyebrow">Resultados</p>
+                <h2 id="survey-results-heading">Encuestas realizadas</h2>
+                <p class="section-intro">Consulta cuántos usuarios eligieron cada respuesta.</p>
+              </div>
+              <div id="survey-results" class="survey-results-list">
+                <p class="message">Cargando encuestas...</p>
+              </div>
+            </section>
           </div>
-          <div id="survey-results" class="survey-results-list">
-            <p class="message">Cargando encuestas...</p>
+
+          <!-- USERS VIEW -->
+          <div id="view-users" class="view-content" hidden>
+            <div class="view-header">
+              <div>
+                <h2>Gestión de Usuarios</h2>
+                <p class="section-intro">Administra los usuarios registrados en la aplicación.</p>
+              </div>
+              <div class="view-header-actions">
+                <input type="search" id="user-search" class="search-input" placeholder="Buscar por nombre o email..." aria-label="Buscar usuarios" />
+              </div>
+            </div>
+            <div class="table-container">
+              <table id="users-table" class="data-table" role="grid">
+                <thead>
+                  <tr>
+                    <th scope="col">Usuario</th>
+                    <th scope="col">Email</th>
+                    <th scope="col">Último aviso</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="users-tbody">
+                  <tr><td colspan="5" class="loading-cell">Cargando usuarios...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="users-pagination" class="pagination" hidden>
+              <button class="pagination-btn" data-page="prev" disabled>Anterior</button>
+              <span class="pagination-info" id="users-page-info">Página 1 de 1</span>
+              <button class="pagination-btn" data-page="next" disabled>Siguiente</button>
+            </div>
           </div>
-        </section>
+
+          <!-- SURVEYS VIEW -->
+          <div id="view-surveys" class="view-content" hidden>
+            <div class="view-header">
+              <div>
+                <h2>Gestión de Encuestas</h2>
+                <p class="section-intro">Crea, edita y administra las encuestas publicadas.</p>
+              </div>
+              <div class="view-header-actions">
+                <button id="new-survey-btn" class="primary-button" type="button">Nueva encuesta</button>
+              </div>
+            </div>
+            <div class="surveys-toolbar">
+              <div class="toolbar-filters">
+                <select id="survey-status-filter" class="filter-select" aria-label="Filtrar por estado">
+                  <option value="">Todos los estados</option>
+                  <option value="active">Activa</option>
+                  <option value="inactive">Desactivada</option>
+                  <option value="scheduled">Programada</option>
+                  <option value="ended">Finalizada</option>
+                </select>
+                <input type="search" id="survey-search" class="search-input" placeholder="Buscar por pregunta..." aria-label="Buscar encuestas" />
+              </div>
+              <div class="toolbar-sort">
+                <label for="survey-sort" class="visually-hidden">Ordenar por</label>
+                <select id="survey-sort" class="filter-select" aria-label="Ordenar por">
+                  <option value="createdAt-desc">Más recientes</option>
+                  <option value="createdAt-asc">Más antiguas</option>
+                  <option value="responses-desc">Más respuestas</option>
+                  <option value="responses-asc">Menos respuestas</option>
+                  <option value="question-asc">Pregunta (A-Z)</option>
+                  <option value="question-desc">Pregunta (Z-A)</option>
+                </select>
+              </div>
+            </div>
+            <div class="table-container">
+              <table id="surveys-table" class="data-table" role="grid">
+                <thead>
+                  <tr>
+                    <th scope="col">Pregunta</th>
+                    <th scope="col">Opciones</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Periodo</th>
+                    <th scope="col">Respuestas</th>
+                    <th scope="col">Creada</th>
+                    <th scope="col">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="surveys-tbody">
+                  <tr><td colspan="7" class="loading-cell">Cargando encuestas...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="surveys-pagination" class="pagination" hidden>
+              <button class="pagination-btn" data-page="prev" disabled>Anterior</button>
+              <span class="pagination-info" id="surveys-page-info">Página 1 de 1</span>
+              <button class="pagination-btn" data-page="next" disabled>Siguiente</button>
+            </div>
+          </div>
+
+          <!-- RESULTS VIEW -->
+          <div id="view-results" class="view-content" hidden>
+            <div class="view-header">
+              <div>
+                <h2>Resultados Detallados</h2>
+                <p class="section-intro">Analiza las respuestas de cada encuesta con detalle.</p>
+              </div>
+            </div>
+            <div id="results-content">
+              <p class="message">Cargando resultados...</p>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
 
@@ -103,12 +253,105 @@
     <div id="delete-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
       <div class="modal-backdrop"></div>
       <div class="modal-content">
-        <h3 id="delete-modal-title">Eliminar encuesta</h3>
-        <p id="delete-modal-message">¿Estás seguro de que quieres eliminar esta encuesta? Se borrarán también todas sus respuestas. Esta acción no se puede deshacer.</p>
+        <h3 id="delete-modal-title">Eliminar</h3>
+        <p id="delete-modal-message">¿Estás seguro? Esta acción no se puede deshacer.</p>
         <div class="modal-actions">
           <button id="delete-modal-cancel" class="secondary-button" type="button">Cancelar</button>
           <button id="delete-modal-confirm" class="primary-button danger" type="button">Eliminar</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Survey Form Modal (for create/edit) -->
+    <div id="survey-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="survey-modal-title">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content modal-large">
+        <h3 id="survey-modal-title">Nueva encuesta</h3>
+        <form id="survey-modal-form" class="survey-form">
+          <input type="hidden" id="survey-modal-id" />
+          <label>
+            Pregunta
+            <textarea id="survey-modal-question" rows="3" required placeholder="Escribe la pregunta"></textarea>
+          </label>
+          <div class="survey-datetime">
+            <label class="datetime-picker-wrapper">
+              <span>Inicio (opcional)</span>
+              <div class="datetime-picker" id="survey-modal-start-picker">
+                <input type="hidden" id="survey-modal-start" />
+                <button type="button" class="datetime-picker-trigger" aria-label="Seleccionar fecha y hora">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span class="datetime-picker-display">Seleccionar</span>
+                </button>
+              </div>
+            </label>
+            <label class="datetime-picker-wrapper">
+              <span>Fin (opcional)</span>
+              <div class="datetime-picker" id="survey-modal-end-picker">
+                <input type="hidden" id="survey-modal-end" />
+                <button type="button" class="datetime-picker-trigger" aria-label="Seleccionar fecha y hora">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span class="datetime-picker-display">Seleccionar</span>
+                </button>
+              </div>
+            </label>
+          </div>
+          <div id="survey-modal-options" class="survey-options">
+            <label>Respuesta 1<input class="survey-option" type="text" required /></label>
+            <label>Respuesta 2<input class="survey-option" type="text" required /></label>
+          </div>
+          <div class="survey-actions">
+            <button id="survey-modal-add-option" class="secondary-button" type="button">Agregar respuesta</button>
+            <button type="submit" class="primary-button">Guardar</button>
+            <button id="survey-modal-cancel" class="secondary-button" type="button">Cancelar</button>
+          </div>
+          <p id="survey-modal-message" class="message" role="status"></p>
+        </form>
+      </div>
+    </div>
+
+    <!-- User Detail Modal -->
+    <div id="user-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="user-modal-title">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content modal-large">
+        <h3 id="user-modal-title">Detalle del usuario</h3>
+        <div id="user-modal-content"></div>
+        <div class="modal-actions">
+          <button id="user-modal-close" class="secondary-button" type="button">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Survey Results Detail Modal -->
+    <div id="results-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="results-modal-title">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content modal-large">
+        <header class="modal-header">
+          <h3 id="results-modal-title">Resultados de la encuesta</h3>
+          <button id="export-csv-btn" class="secondary-button" type="button" disabled>Exportar CSV</button>
+        </header>
+        <div id="results-modal-content"></div>
+        <div class="modal-actions">
+          <button id="results-modal-close" class="secondary-button" type="button">Cerrar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DateTime Picker Dropdown (shared) -->
+    <div id="datetime-picker-dropdown" class="datetime-picker-dropdown" hidden role="dialog" aria-modal="false">
+      <div class="datetime-picker-header">
+        <button type="button" class="datetime-nav-btn" data-nav="prev-month" aria-label="Mes anterior">‹</button>
+        <span class="datetime-picker-title"></span>
+        <button type="button" class="datetime-nav-btn" data-nav="next-month" aria-label="Mes siguiente">›</button>
+      </div>
+      <div class="datetime-picker-weekdays"></div>
+      <div class="datetime-picker-days"></div>
+      <div class="datetime-picker-time">
+        <label>Hora: <input type="number" id="datetime-picker-hour" min="0" max="23" value="12" style="width: 60px;"></label>
+        <label>Min: <input type="number" id="datetime-picker-minute" min="0" max="59" step="5" value="0" style="width: 60px;"></label>
+      </div>
+      <div class="datetime-picker-actions">
+        <button type="button" class="secondary-button" id="datetime-picker-clear">Limpiar</button>
+        <button type="button" class="primary-button" id="datetime-picker-confirm">Aceptar</button>
       </div>
     </div>
 
