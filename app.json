@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "App",
-    "slug": "App",
+    "name": "Estoy Bien",
+    "slug": "estoy-bien",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "y",
+      "bundleIdentifier": "com.estoybien.toyvivo",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -19,7 +19,7 @@
         "backgroundColor": "#ffffff"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.cristiansolana1.App"
+      "package": "com.estoybien.toyvivo"
     },
     "web": {
       "favicon": "./assets/favicon.png"

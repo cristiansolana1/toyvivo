@@ -19,11 +19,15 @@ export function WatchedUserCard({ user, onCall, onRemove, currentTime }: Watched
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Text style={styles.name}>{user.fullName}</Text>
+        <View style={styles.nameWrap}>
+          <Text style={styles.name}>{user.fullName}</Text>
+          <Text style={[styles.badge, overdue ? styles.badgeWarning : styles.badgeOk]}>
+            {overdue ? "Sin aviso" : "Activo"}
+          </Text>
+        </View>
       </View>
       <Text style={[styles.status, overdue && styles.overdue]}>
-        Último aviso:{" "}
-        {user.lastAliveAt ? new Date(user.lastAliveAt).toLocaleString() : "Sin aviso todavía"}
+        Último aviso: {user.lastAliveAt ? new Date(user.lastAliveAt).toLocaleString() : "Sin aviso todavía"}
       </Text>
       <View style={styles.actions}>
         <Pressable onPress={handleCall} disabled={!user.phone} accessibilityLabel="Llamar">
@@ -40,26 +44,51 @@ export function WatchedUserCard({ user, onCall, onRemove, currentTime }: Watched
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#d5dfd8",
     backgroundColor: "#ffffff",
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: 14,
+    padding: 14,
     marginBottom: 10,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 4,
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  nameWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
   },
   name: {
     fontSize: 16,
     fontWeight: "700",
     color: "#0f172a",
   },
+  badge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  badgeOk: {
+    backgroundColor: "#d4f4dd",
+    color: "#1a6e3a",
+  },
+  badgeWarning: {
+    backgroundColor: "#ffe8e8",
+    color: "#a83f32",
+  },
   status: {
     fontSize: 14,
     color: "#334155",
-    marginBottom: 8,
+    marginBottom: 10,
+    lineHeight: 20,
   },
   overdue: {
     color: "#dc2626",

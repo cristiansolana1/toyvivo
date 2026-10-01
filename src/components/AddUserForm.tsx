@@ -16,12 +16,13 @@ export function AddUserForm({ value, onChangeText, onSubmit, disabled, message }
           style={[styles.input, styles.dniInput]}
           keyboardType="number-pad"
           placeholder="DNI del usuario"
+          placeholderTextColor="#64748b"
           value={value}
           onChangeText={(text) => onChangeText(text.replace(/[^0-9]/g, ""))}
           accessibilityLabel="DNI del usuario a seguir"
         />
         <Pressable style={[styles.primaryButton, styles.submitButton]} onPress={onSubmit} disabled={disabled} accessibilityLabel="Agregar usuario">
-          <Text style={styles.primaryButtonText}>{disabled ? "Agregando..." : "Agregar usuario"}</Text>
+          <Text style={styles.primaryButtonText}>{disabled ? "Agregando..." : "Agregar"}</Text>
         </Pressable>
       </View>
       {message ? <Text style={styles.message}>{message}</Text> : null}
@@ -32,46 +33,46 @@ export function AddUserForm({ value, onChangeText, onSubmit, disabled, message }
 const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: 8,
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#cbd5e1",
-    backgroundColor: "#fff",
-    borderRadius: 10,
+    borderColor: "#c8d8cf",
+    backgroundColor: "#f4f8f5",
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    marginBottom: 12,
     fontSize: 16,
+    color: "#15231f",
   },
   dniInput: {
     flex: 1,
   },
   submitButton: {
     flexShrink: 0,
-    minWidth: 132,
+    minWidth: 116,
     minHeight: 48,
     paddingHorizontal: 12,
-    marginBottom: 12,
+    marginBottom: 0,
   },
   primaryButton: {
-    backgroundColor: "#0f172a",
+    backgroundColor: "#286052",
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
-    marginTop: 4,
-    marginBottom: 14,
   },
   primaryButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    color: "#fffdf8",
+    fontSize: 15,
+    fontWeight: "700",
   },
   message: {
-    color: "#15803d",
+    color: "#1a6e3a",
     textAlign: "center",
-    paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    fontWeight: "600",
   },
 });

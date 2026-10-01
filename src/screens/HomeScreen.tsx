@@ -159,10 +159,14 @@ export function HomeScreen({
         />
       }
       contentContainerStyle={styles.screen}>
-      <View style={styles.topMenuRow}>
+      <View style={styles.statusCard}>
+        <View>
+          <Text style={styles.statusLabel}>Estado actual</Text>
+          <Text style={styles.title}>Hola, {profile?.fullName ?? user?.email?.split("@")[0] ?? "Invitado"}</Text>
+        </View>
         <Pressable style={styles.profileMenuButton} onPress={() => setShowProfileEditor((previous) => !previous)}>
           <Text style={styles.profileMenuButtonText}>
-            {showProfileEditor ? "Ocultar edición" : "Editar datos personales"}
+            {showProfileEditor ? "Ocultar" : "Editar"}
           </Text>
         </Pressable>
       </View>
@@ -181,7 +185,6 @@ export function HomeScreen({
         />
       ) : null}
 
-      <Text style={styles.title}>Hola, {profile?.fullName ?? user?.email?.split("@")[0] ?? "Invitado"}</Text>
       <Text style={[styles.subtitle, overdue && styles.overdueText]}>
         Último aviso: {formattedLastHeartbeat}
       </Text>
@@ -208,8 +211,8 @@ export function HomeScreen({
         isOnline={isOnline}
       />
 
-      <Text style={styles.sectionTitle}>Ver estado de otros usuarios</Text>
-      <Text style={styles.counterText}>Agregados: {watchingUserIds.length}</Text>
+      <Text style={styles.sectionTitle}>Seguridad de tus contactos</Text>
+      <Text style={styles.counterText}>Contactos activos: {watchingUserIds.length}</Text>
       <AddUserForm
         value={watchDni}
         onChangeText={setWatchDni}
@@ -218,17 +221,24 @@ export function HomeScreen({
         message={watchMessage}
       />
 
-      {sortedWatchedUsers.map((watchedUser) => (
-        <WatchedUserCard
-          key={watchedUser.uid}
-          user={watchedUser}
-          onCall={callWatchedUser}
-          onRemove={removeWatchedUser}
-          currentTime={currentTime}
-        />
-      ))}
+      {sortedWatchedUsers.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateTitle}>Todavía no agregaste contactos</Text>
+          <Text style={styles.emptyStateText}>Agrega el DNI de una persona para recibir su estado y avisarte si hay una alerta.</Text>
+        </View>
+      ) : (
+        sortedWatchedUsers.map((watchedUser) => (
+          <WatchedUserCard
+            key={watchedUser.uid}
+            user={watchedUser}
+            onCall={callWatchedUser}
+            onRemove={removeWatchedUser}
+            currentTime={currentTime}
+          />
+        ))
+      )}
 
-      <Pressable onPress={() => void onSignOut()}>
+      <Pressable style={styles.logoutButton} onPress={() => void onSignOut()}>
         <Text style={styles.linkText}>Cerrar sesión</Text>
       </Pressable>
       <View style={styles.bottomButtonsRow}>
@@ -245,13 +255,29 @@ export function HomeScreen({
 
 const styles = StyleSheet.create({
   screen: {
+    backgroundColor: "#edf3ef",
     paddingHorizontal: 24,
     paddingVertical: 28,
+  },
+  statusCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  statusLabel: {
+    color: "#6e8279",
+    fontSize: 12,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    fontWeight: "700",
+    marginBottom: 6,
   },
   title: {
     fontSize: 28,
     fontWeight: "700",
-    color: "#0f172a",
+    color: "#15231f",
     marginBottom: 8,
   },
   subtitle: {
@@ -274,27 +300,52 @@ const styles = StyleSheet.create({
     color: "#475569",
     marginBottom: 10,
   },
-  topMenuRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    gap: 8,
+  emptyState: {
+    backgroundColor: "#fffdf8",
+    borderWidth: 1,
+    borderColor: "#d5dfd8",
+    borderRadius: 14,
+    padding: 18,
+    marginTop: 8,
     marginBottom: 16,
   },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#15231f",
+    marginBottom: 6,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: "#587068",
+    lineHeight: 20,
+  },
   profileMenuButton: {
-    backgroundColor: "#e2e8f0",
+    backgroundColor: "#286052",
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   profileMenuButtonText: {
-    color: "#0f172a",
+    color: "#fffdf8",
     fontWeight: "700",
+  },
+  logoutButton: {
+    alignSelf: "center",
+    width: "100%",
+    marginTop: 18,
+    marginBottom: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: "#fffdf8",
+    borderWidth: 1,
+    borderColor: "#d5dfd8",
   },
   linkText: {
     textAlign: "center",
-    color: "#2563eb",
-    fontWeight: "600",
+    color: "#9d4e30",
+    fontWeight: "700",
   },
   shareButton: {
     alignSelf: "center",
