@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useToast } from "../hooks/useToast";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { setDoc, doc, serverTimestamp } from "firebase/firestore";
@@ -23,6 +24,7 @@ export function ProfileSetupScreen({
   const [birthDateISO, setBirthDateISO] = useState("");
   const [birthDateDisplay, setBirthDateDisplay] = useState("");
   const [saving, setSaving] = useState(false);
+  const { showToast } = useToast();
 
   const handleSave = async () => {
     const profile: UserProfile = {
@@ -60,10 +62,10 @@ export function ProfileSetupScreen({
         },
         { merge: true }
       );
-      Alert.alert("Guardado", "Tus datos se guardaron correctamente.");
+      showToast({ text: "Tus datos se guardaron correctamente.", type: "success" });
       onSaved(profile);
     } catch (error) {
-      Alert.alert("Error", "No se pudieron guardar tus datos: " + (error instanceof Error ? error.message : String(error)));
+      showToast({ text: "No se pudieron guardar tus datos: " + (error instanceof Error ? error.message : String(error)), type: "error" });
     } finally {
       setSaving(false);
     }

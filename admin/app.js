@@ -26,6 +26,33 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const ADMIN_EMAIL = "cristiansolana1@gmail.com";
 
+const PROVINCES_AR = [
+  { label: "Buenos Aires", code: "BA" },
+  { label: "CABA", code: "CABA" },
+  { label: "Catamarca", code: "CT" },
+  { label: "Chaco", code: "CH" },
+  { label: "Chubut", code: "CU" },
+  { label: "Córdoba", code: "CB" },
+  { label: "Corrientes", code: "CR" },
+  { label: "Entre Ríos", code: "ER" },
+  { label: "Formosa", code: "FO" },
+  { label: "Jujuy", code: "JY" },
+  { label: "La Pampa", code: "LP" },
+  { label: "La Rioja", code: "LR" },
+  { label: "Mendoza", code: "MZ" },
+  { label: "Misiones", code: "MI" },
+  { label: "Neuquén", code: "NQ" },
+  { label: "Río Negro", code: "RN" },
+  { label: "Salta", code: "SA" },
+  { label: "San Juan", code: "SJ" },
+  { label: "San Luis", code: "SL" },
+  { label: "Santa Cruz", code: "SC" },
+  { label: "Santa Fe", code: "SF" },
+  { label: "Santiago del Estero", code: "SE" },
+  { label: "Tierra del Fuego", code: "TF" },
+  { label: "Tucumán", code: "TM" },
+];
+
 const loginView = document.querySelector("#login-view");
 const dashboardView = document.querySelector("#dashboard-view");
 const loginForm = document.querySelector("#login-form");
@@ -1437,7 +1464,7 @@ function renderSurveysTable() {
   const pageSurveys = filteredSurveys.slice(start, end);
   
   if (pageSurveys.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="loading-cell">No hay encuestas que coincidan.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="loading-cell">No hay encuestas que coincidan.</td></tr>';
     updatePagination(0);
     return;
   }
@@ -1450,12 +1477,24 @@ function renderSurveysTable() {
     if (survey.endAt) period.push(`Fin: ${formatDateTime(survey.endAt)}`);
     const periodText = period.join(" · ") || "Sin fechas";
     
+    // Targeting display
+    let targetingText = "Todos";
+    if (survey.targetCountry) {
+      const countryLabel = survey.targetCountry === "AR" ? "Argentina" : survey.targetCountry;
+      targetingText = countryLabel;
+      if (survey.targetProvince) {
+        const province = PROVINCES_AR.find(p => p.code === survey.targetProvince);
+        targetingText += ` / ${province?.label || survey.targetProvince}`;
+      }
+    }
+    
     return `
       <tr data-survey-id="${survey.id}">
         <td><strong>${escapeHtml(survey.question)}</strong></td>
         <td>${escapeHtml(optionsText)}</td>
         <td><span class="status-badge ${status.class.replace("status-", "")}">${status.text}</span></td>
         <td>${escapeHtml(periodText)}</td>
+        <td>${escapeHtml(targetingText)}</td>
         <td>${survey.totalResponses}</td>
         <td>${survey.createdAt ? formatDate(survey.createdAt) : "—"}</td>
         <td>
@@ -1537,6 +1576,8 @@ function openSurveyModal(survey) {
   const endInput = document.querySelector("#survey-modal-end");
   const startPicker = document.querySelector("#survey-modal-start-picker");
   const endPicker = document.querySelector("#survey-modal-end-picker");
+  const targetCountrySelect = document.querySelector("#survey-modal-target-country");
+  const targetProvinceSelect = document.querySelector("#survey-modal-target-province");
   const optionsContainer = document.querySelector("#survey-modal-options");
   const message = document.querySelector("#survey-modal-message");
   const hiddenId = document.querySelector("#survey-modal-id");
@@ -1548,6 +1589,11 @@ function openSurveyModal(survey) {
   `;
   message.textContent = "";
   
+  // Reset targeting selectors
+  targetCountrySelect.value = "";
+  targetProvinceSelect.value = "";
+  targetProvinceSelect.disabled = true;
+  
   if (survey) {
     editingSurveyId = survey.id;
     title.textContent = "Editar encuesta";
@@ -1555,6 +1601,16 @@ function openSurveyModal(survey) {
     questionInput.value = survey.question;
     startInput.value = survey.startAt ? formatDateTimeForInput(survey.startAt) : "";
     endInput.value = survey.endAt ? formatDateTimeForInput(survey.endAt) : "";
+    
+    // Set targeting values
+    if (survey.targetCountry) {
+      targetCountrySelect.value = survey.targetCountry;
+      targetProvinceSelect.disabled = false;
+      if (survey.targetProvince) {
+        targetProvinceSelect.value = survey.targetProvince;
+      }
+    }
+    
     optionsContainer.innerHTML = survey.options.map((opt, i) => 
       `<label>Respuesta ${i + 1}<input class="survey-option" type="text" required value="${escapeHtml(opt)}" /></label>`
     ).join("");
@@ -1578,6 +1634,19 @@ function openSurveyModal(survey) {
   
   newStartTrigger.addEventListener("click", () => openDateTimePicker(startInput, newStartTrigger));
   newEndTrigger.addEventListener("click", () => openDateTimePicker(endInput, newEndTrigger));
+  
+  // Country/province change handler
+  const newCountrySelect = targetCountrySelect.cloneNode(true);
+  targetCountrySelect.parentNode.replaceChild(newCountrySelect, targetCountrySelect);
+  newCountrySelect.addEventListener("change", (e) => {
+    const provinceSelect = document.querySelector("#survey-modal-target-province");
+    if (e.target.value) {
+      provinceSelect.disabled = false;
+    } else {
+      provinceSelect.disabled = true;
+      provinceSelect.value = "";
+    }
+  });
   
   modal.hidden = false;
   document.body.style.overflow = "hidden";
@@ -1617,6 +1686,8 @@ document.querySelector("#survey-modal-form").addEventListener("submit", async (e
     .filter(Boolean);
   const startValue = document.querySelector("#survey-modal-start").value;
   const endValue = document.querySelector("#survey-modal-end").value;
+  const targetCountry = document.querySelector("#survey-modal-target-country").value;
+  const targetProvince = document.querySelector("#survey-modal-target-province").value;
   
   if (options.length < 2 || options.length > 4) {
     message.textContent = "Agrega entre 2 y 4 respuestas.";
@@ -1628,6 +1699,12 @@ document.querySelector("#survey-modal-form").addEventListener("submit", async (e
     return;
   }
   
+  // Validate province requires country
+  if (targetProvince && !targetCountry) {
+    message.textContent = "Debe seleccionar un país antes de elegir una provincia.";
+    return;
+  }
+  
 const surveyData = {
     question,
     options,
@@ -1635,6 +1712,9 @@ const surveyData = {
     createdBy: ADMIN_EMAIL,
     updatedAt: serverTimestamp(),
   };
+  
+  if (targetCountry) surveyData.targetCountry = targetCountry;
+  if (targetProvince) surveyData.targetProvince = targetProvince;
 
   if (!editingSurveyId) {
     surveyData.createdAt = serverTimestamp();

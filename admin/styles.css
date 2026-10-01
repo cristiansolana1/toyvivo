@@ -408,7 +408,19 @@ textarea:focus { border-color: #286052; box-shadow: 0 0 0 3px #28605220; }
 
 .datetime-picker-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #e8efe9; }
 
+/* ===== SURVEY TARGETING ===== */
+.survey-targeting { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; padding: 16px; background: #f8faf7; border: 1px solid #e8efe9; border-radius: 8px; }
+
+.survey-targeting label { display: flex; flex-direction: column; gap: 8px; }
+
+.survey-targeting select { padding: 11px 14px; color: #15231f; background: #f4f8f5; border: 1px solid #c8d8cf; border-radius: 6px; outline: none; font-size: 14px; }
+
+.survey-targeting select:focus { border-color: #286052; box-shadow: 0 0 0 3px #28605220; }
+
+.survey-targeting select:disabled { background: #e8efe9; color: #6e8279; cursor: not-allowed; }
+
 @media (max-width: 700px) {
+  .survey-targeting { grid-template-columns: 1fr; }
   .survey-datetime { grid-template-columns: 1fr; }
   .datetime-picker-dropdown { left: 16px !important; right: 16px !important; min-width: auto; }
 }

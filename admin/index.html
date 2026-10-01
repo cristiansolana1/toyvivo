@@ -216,13 +216,14 @@
                     <th scope="col">Opciones</th>
                     <th scope="col">Estado</th>
                     <th scope="col">Periodo</th>
+                    <th scope="col">Destino</th>
                     <th scope="col">Respuestas</th>
                     <th scope="col">Creada</th>
                     <th scope="col">Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="surveys-tbody">
-                  <tr><td colspan="7" class="loading-cell">Cargando encuestas...</td></tr>
+                  <tr><td colspan="8" class="loading-cell">Cargando encuestas...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -293,6 +294,45 @@
                   <span class="datetime-picker-display">Seleccionar</span>
                 </button>
               </div>
+            </label>
+          </div>
+          <div class="survey-targeting">
+            <label>
+              País destino (opcional)
+              <select id="survey-modal-target-country" class="target-country-select">
+                <option value="">Todos los países</option>
+                <option value="AR">Argentina</option>
+              </select>
+            </label>
+            <label>
+              Provincia destino (opcional)
+              <select id="survey-modal-target-province" class="target-province-select" disabled>
+                <option value="">Todas las provincias</option>
+                <option value="BA">Buenos Aires</option>
+                <option value="CABA">CABA</option>
+                <option value="CT">Catamarca</option>
+                <option value="CH">Chaco</option>
+                <option value="CU">Chubut</option>
+                <option value="CB">Córdoba</option>
+                <option value="CR">Corrientes</option>
+                <option value="ER">Entre Ríos</option>
+                <option value="FO">Formosa</option>
+                <option value="JY">Jujuy</option>
+                <option value="LP">La Pampa</option>
+                <option value="LR">La Rioja</option>
+                <option value="MZ">Mendoza</option>
+                <option value="MI">Misiones</option>
+                <option value="NQ">Neuquén</option>
+                <option value="RN">Río Negro</option>
+                <option value="SA">Salta</option>
+                <option value="SJ">San Juan</option>
+                <option value="SL">San Luis</option>
+                <option value="SC">Santa Cruz</option>
+                <option value="SF">Santa Fe</option>
+                <option value="SE">Santiago del Estero</option>
+                <option value="TF">Tierra del Fuego</option>
+                <option value="TM">Tucumán</option>
+              </select>
             </label>
           </div>
           <div id="survey-modal-options" class="survey-options">

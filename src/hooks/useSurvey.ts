@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getUnansweredSurvey, submitSurveyResponse } from "../services/surveyService";
-import { Survey } from "../types";
+import { Survey, UserProfile } from "../types";
 
 interface UseSurveyReturn {
   survey: Survey | null;
@@ -12,20 +12,23 @@ interface UseSurveyReturn {
   handleSurveySubmit: () => Promise<void>;
 }
 
-export function useSurvey(userId: string): UseSurveyReturn {
+export function useSurvey(userId: string, userProfile?: UserProfile): UseSurveyReturn {
   const [survey, setSurvey] = useState<Survey | null>(null);
   const [surveyAnswer, setSurveyAnswer] = useState<string | null>(null);
   const [surveySubmitted, setSurveySubmitted] = useState(false);
   const [surveyMessage, setSurveyMessage] = useState<string | null>(null);
   const [submittingSurvey, setSubmittingSurvey] = useState(false);
 
+  const userCountry = userProfile?.country;
+  const userProvince = userProfile?.province;
+
   useEffect(() => {
     loadSurvey();
-  }, [userId]);
+  }, [userId, userCountry, userProvince]);
 
   const loadSurvey = useCallback(async () => {
     try {
-      const unansweredSurvey = await getUnansweredSurvey(userId);
+      const unansweredSurvey = await getUnansweredSurvey(userId, userCountry, userProvince);
       if (!unansweredSurvey) {
         setSurvey(null);
         return;
@@ -37,7 +40,7 @@ export function useSurvey(userId: string): UseSurveyReturn {
     } catch {
       setSurveyMessage("No se pudo cargar la encuesta.");
     }
-  }, [userId]);
+  }, [userId, userCountry, userProvince]);
 
   const handleSurveySubmit = useCallback(async () => {
     if (!survey || !surveyAnswer || surveySubmitted) return;

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useToast } from "../hooks/useToast";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { UserProfile } from "../types";
@@ -21,6 +22,7 @@ export function ProfileEditor({ profile, onSave, onCancel, saving }: ProfileEdit
   const [birthDateISO, setBirthDateISO] = useState(profile.birthDate ?? "");
   const [birthDateDisplay, setBirthDateDisplay] = useState(toDDMMYYYY(profile.birthDate ?? ""));
   const [localSaving, setLocalSaving] = useState(false);
+  const { showToast } = useToast();
 
   const handleSave = async () => {
     const updatedProfile: UserProfile = {
@@ -43,9 +45,9 @@ export function ProfileEditor({ profile, onSave, onCancel, saving }: ProfileEdit
     const success = await onSave(updatedProfile);
     setLocalSaving(false);
     if (success) {
-      Alert.alert("Guardado", "Tus datos se actualizaron correctamente.");
+      showToast({ text: "Tus datos se actualizaron correctamente.", type: "success" });
     } else {
-      Alert.alert("Error", "No se pudieron guardar los cambios.");
+      showToast({ text: "No se pudieron guardar los cambios.", type: "error" });
     }
   };
 

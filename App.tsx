@@ -1,6 +1,8 @@
+import { SkeletonLoader } from "./src/components/SkeletonLoader";
 import { StatusBar } from "expo-status-bar";
+import { StyleSheet } from "react-native";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, SafeAreaView, View } from "react-native";
+import { ActivityIndicator, SafeAreaView, Text, View } from "react-native";
 import {
   User,
   onAuthStateChanged,
@@ -97,11 +99,11 @@ export default function App() {
     void hydrateProfile(user);
   }, [user]);
 
-  if (bootLoading) {
+if (bootLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color="#0f172a" />
+          <SkeletonLoader variant="card" width={150} height={100} animated={true} />
           <Text style={styles.subtitle}>Cargando aplicación...</Text>
         </View>
       </SafeAreaView>
@@ -136,8 +138,6 @@ export default function App() {
     </SafeAreaView>
   );
 }
-
-import { StyleSheet, Text } from "react-native";
 
 const styles = StyleSheet.create({
   container: {

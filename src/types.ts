@@ -17,6 +17,8 @@ export type Survey = {
   id: string;
   question: string;
   options: string[];
+  targetCountry?: string; // ISO country code (e.g., "AR") - optional, if not set targets all countries
+  targetProvince?: string; // Province code (e.g., "BA") - optional, requires targetCountry
 };
 
 export type WatchedUserStatus = {

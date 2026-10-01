@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Linking, RefreshControl, Pressable, ScrollView, Share, StyleSheet, Text, View, ActivityIndicator } from "react-native";
+import React from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "../hooks/useToast";
+import { Alert, Linking, RefreshControl, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { SkeletonLoader } from "../components/SkeletonLoader";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 import { useWatchedUsers } from "../hooks/useWatchedUsers";
 import { useSurvey } from "../hooks/useSurvey";
@@ -26,6 +29,14 @@ export function HomeScreen({
   onSignOut: () => Promise<void>;
 }) {
   if (!user) return null;
+
+  const { profile: currentProfile, loading, saving, saveProfile } = useProfile(user.uid, profile ?? undefined) as {
+    profile: UserProfile | null;
+    loading: boolean;
+    saving: boolean;
+    saveProfile: (profile: UserProfile) => Promise<boolean>;
+    setProfile: (profile: UserProfile | null) => void;
+  };
 
   const {
     lastHeartbeat,
@@ -58,19 +69,16 @@ export function HomeScreen({
     surveyMessage,
     submittingSurvey,
     handleSurveySubmit,
-  } = useSurvey(user.uid);
-
-  const { profile: currentProfile, loading, saving, saveProfile } = useProfile(user.uid, profile ?? undefined) as {
-    profile: UserProfile | null;
-    loading: boolean;
-    saving: boolean;
-    saveProfile: (profile: UserProfile) => Promise<boolean>;
-    setProfile: (profile: UserProfile | null) => void;
-  };
+  } = useSurvey(user.uid, currentProfile ?? undefined);
 
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [watchDni, setWatchDni] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [entryError, setEntryError] = useState<string | null>(null);
+  const { showToast } = useToast();
+
+  // Clear error when starting new operation
+  const clearEntryError = useCallback(() => setEntryError(null), []);
 
   const sortedWatchedUsers = useMemo(() => {
     return [...watchedUsers].sort((a, b) => {
@@ -81,13 +89,21 @@ export function HomeScreen({
   }, [watchedUsers]);
 
   const handleSaveProfile = async (updatedProfile: any): Promise<boolean> => {
-    const success = await saveProfile(updatedProfile);
-    if (success) {
-      onProfileUpdated(updatedProfile);
-      setShowProfileEditor(false);
-      return true;
+    try {
+      clearEntryError();
+      const success = await saveProfile(updatedProfile);
+      if (success) {
+        onProfileUpdated(updatedProfile);
+        setShowProfileEditor(false);
+        return true;
+      }
+      setEntryError("No se pudieron guardar los cambios. Inténtalo de nuevo.");
+      return false;
+    } catch (error) {
+      clearEntryError();
+      setEntryError("Error al guardar: " + (error instanceof Error ? error.message : "Error desconocido"));
+      return false;
     }
-    return false;
   };
 
   const handleShareApp = async () => {
@@ -104,21 +120,22 @@ export function HomeScreen({
   const callWatchedUser = async (phone: string) => {
     const sanitizedPhone = phone.replace(/[^0-9+]/g, "");
     if (!sanitizedPhone || sanitizedPhone.replace(/[^0-9]/g, "").length < 5) {
-      Alert.alert("Sin teléfono", "Este usuario no tiene teléfono registrado.");
+      showToast({ text: "Este usuario no tiene teléfono registrado.", type: "error" });
       return;
     }
     const telUrl = `tel:${sanitizedPhone}`;
     try {
       await Linking.openURL(telUrl);
+      showToast({ text: "Llamada iniciada.", type: "info" });
     } catch {
-      Alert.alert("No disponible", "No se pudo abrir la aplicación de llamadas en este dispositivo.");
+      showToast({ text: "No se pudo abrir la aplicación de llamadas.", type: "error" });
     }
   };
 
   if (loading) {
     return (
       <View style={styles.loadingWrap}>
-        <ActivityIndicator size="large" color="#0f172a" />
+        <SkeletonLoader variant="text" width={200} height={30} animated={true} />
         <Text style={styles.subtitle}>Cargando perfil...</Text>
       </View>
     );
@@ -149,7 +166,13 @@ export function HomeScreen({
           </Text>
         </Pressable>
       </View>
-      {showProfileEditor && currentProfile ? (
+      {entryError && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>{entryError}</Text>
+        </View>
+      )}
+
+      {showProfileEditor && currentProfile?.fullName ? (
         <ProfileEditor
           profile={currentProfile}
           onSave={handleSaveProfile}
@@ -310,5 +333,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 40,
+  },
+  errorBanner: {
+    backgroundColor: "#f8d7da",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#f5c6cb",
+    padding: 12,
+    marginBottom: 16,
+    color: "#842029",
+    fontSize: 14,
+  },
+  errorBannerText: {
+    color: "#842029",
+    fontWeight: "500",
   },
 });

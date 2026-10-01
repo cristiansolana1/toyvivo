@@ -85,33 +85,42 @@ export async function getWatchedUsersStatus(userIds: string[]): Promise<WatchedU
       const dni = id.slice("dni:".length);
       const result = await getUserByDni(dni);
       if (!result) {
-        return { uid: id, fullName: "Usuario sin Cuenta", phone: "", lastAliveAt: null };
+        return { uid: id, fullName: "Usuario sin Cuenta", phone: "", lastAliveAt: null } as WatchedUserStatus;
       }
       return {
         uid: id,
         fullName: result.profile.fullName,
         phone: result.profile.phone,
         lastAliveAt: null,
-      };
+      } as WatchedUserStatus;
     })
   );
 
-  const registeredUsers = await Promise.all(
-    registeredIds.map(async (uid) => {
-      const profile = await getUserById(uid);
-      if (!profile) return null;
-      const userDoc = await getDoc(doc(db, "users", uid));
-      const data = userDoc.data();
-      return {
-        uid,
-        fullName: profile.fullName,
-        phone: profile.phone,
-        lastAliveAt: data?.lastAliveAt?.toDate?.()?.toISOString?.() ?? null,
-      };
-    })
-  );
+  // Batch read for registered users - get all docs in parallel (optimized from N individual calls)
+  let registeredUsers: WatchedUserStatus[] = [];
+  if (registeredIds.length > 0) {
+    const userDocs = await Promise.all(
+      registeredIds.map((uid) => getDoc(doc(db, "users", uid)))
+    );
+    const userData = userDocs.map((doc) => doc.data());
+    const newUsers = await Promise.all(
+      registeredIds.map((uid, index) => {
+        const data = userData[index];
+        if (!data) return null;
+        const profile = (data.publicProfile ?? data.profile) as UserProfile | undefined;
+        if (!profile) return null;
+        return {
+          uid,
+          fullName: profile.fullName,
+          phone: profile.phone,
+          lastAliveAt: data.lastAliveAt?.toDate?.()?.toISOString?.() ?? null,
+        } as WatchedUserStatus;
+      })
+    );
+    registeredUsers = newUsers.filter((u): u is WatchedUserStatus => u !== null);
+  }
 
-  return [...dniUsers, ...registeredUsers.filter((u): u is NonNullable<typeof u> => u !== null)];
+  return [...dniUsers, ...registeredUsers];
 }
 
 export function subscribeToWatchedUsers(

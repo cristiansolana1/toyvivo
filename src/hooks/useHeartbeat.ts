@@ -63,7 +63,8 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
       }
     } catch (error) {
       console.error("Error sending heartbeat:", error);
-      throw error;
+      setSending(false);
+      // Error is already handled by syncPending on reconnection
     } finally {
       setSending(false);
     }
