@@ -6,14 +6,16 @@ import { isHeartbeatOverdue } from "../constants";
 interface WatchedUserCardProps {
   user: WatchedUserStatus;
   onCall: (phone: string) => void;
+  onWhatsApp: (phone: string) => void;
   onRemove: (uid: string) => void;
   currentTime: number;
 }
 
-export function WatchedUserCard({ user, onCall, onRemove, currentTime }: WatchedUserCardProps) {
+export function WatchedUserCard({ user, onCall, onWhatsApp, onRemove, currentTime }: WatchedUserCardProps) {
   const overdue = isHeartbeatOverdue(user.lastAliveAt, currentTime);
 
   const handleCall = () => onCall(user.phone);
+  const handleWhatsAppMessage = () => onWhatsApp(user.phone);
   const handleRemove = () => onRemove(user.uid);
 
   return (
@@ -30,9 +32,14 @@ export function WatchedUserCard({ user, onCall, onRemove, currentTime }: Watched
         Último aviso: {user.lastAliveAt ? new Date(user.lastAliveAt).toLocaleString() : "Sin aviso todavía"}
       </Text>
       <View style={styles.actions}>
-        <Pressable onPress={handleCall} disabled={!user.phone} accessibilityLabel="Llamar">
-          <Text style={[styles.callText, !user.phone && styles.callTextDisabled]}>Llamar</Text>
-        </Pressable>
+        <View style={styles.primaryActions}>
+          <Pressable onPress={handleCall} disabled={!user.phone} accessibilityLabel="Llamar">
+            <Text style={[styles.callText, !user.phone && styles.callTextDisabled]}>Llamar</Text>
+          </Pressable>
+          <Pressable onPress={handleWhatsAppMessage} disabled={!user.phone} accessibilityLabel="Enviar WhatsApp">
+            <Text style={[styles.whatsappText, !user.phone && styles.callTextDisabled]}>WhatsApp</Text>
+          </Pressable>
+        </View>
         <Pressable onPress={handleRemove} accessibilityLabel="Quitar usuario">
           <Text style={styles.removeText}>Quitar</Text>
         </Pressable>
@@ -98,9 +105,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 12,
+  },
+  primaryActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
   },
   callText: {
     color: "#2563eb",
+    fontWeight: "700",
+  },
+  whatsappText: {
+    color: "#1f9d55",
     fontWeight: "700",
   },
   callTextDisabled: {

@@ -132,6 +132,27 @@ export function HomeScreen({
     }
   };
 
+  const messageWatchedUser = async (phone: string) => {
+    const digits = phone.replace(/\D/g, "");
+    if (!digits || digits.length < 8) {
+      showToast({ text: "Este usuario no tiene teléfono registrado.", type: "error" });
+      return;
+    }
+
+    const whatsappNumber = digits.startsWith("54") ? digits : `54${digits.replace(/^0+/, "")}`;
+    const message = encodeURIComponent("Hola, te escribo desde la app de Aviso de vida.");
+    const appUrl = `whatsapp://send?phone=${whatsappNumber}&text=${message}`;
+    const webUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
+
+    try {
+      const canOpenApp = await Linking.canOpenURL(appUrl);
+      await Linking.openURL(canOpenApp ? appUrl : webUrl);
+      showToast({ text: "Se abrió WhatsApp.", type: "info" });
+    } catch {
+      showToast({ text: "No se pudo abrir WhatsApp.", type: "error" });
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingWrap}>
@@ -232,6 +253,7 @@ export function HomeScreen({
             key={watchedUser.uid}
             user={watchedUser}
             onCall={callWatchedUser}
+            onWhatsApp={messageWatchedUser}
             onRemove={removeWatchedUser}
             currentTime={currentTime}
           />
@@ -243,10 +265,10 @@ export function HomeScreen({
       </Pressable>
       <View style={styles.bottomButtonsRow}>
         <Pressable style={styles.shareButton} onPress={() => void handleShareApp()}>
-          <Text style={styles.shareButtonText}>Compartir aplicación</Text>
+          <Text style={styles.shareButtonText}>📤 Invitar a compartir</Text>
         </Pressable>
         <Pressable style={styles.instagramButton} onPress={() => void Linking.openURL("https://www.instagram.com/estoybien.arg")}>
-          <Text style={styles.instagramButtonText}>📷 Instagram</Text>
+          <Text style={styles.instagramButtonText}>📷 Seguir en Instagram</Text>
         </Pressable>
       </View>
     </ScrollView>
@@ -353,31 +375,40 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: "#2563eb",
+    borderRadius: 12,
+    backgroundColor: "#286052",
+    borderWidth: 1,
+    borderColor: "#1e4b40",
+    minWidth: 150,
   },
   shareButtonText: {
-    color: "#fff",
+    color: "#fffdf8",
     fontWeight: "700",
+    textAlign: "center",
   },
   bottomButtonsRow: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     gap: 12,
-    marginTop: 28,
+    marginTop: 24,
     marginBottom: 12,
+    flexWrap: "wrap",
   },
   instagramButton: {
     paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: "#E1306C",
+    borderRadius: 12,
+    backgroundColor: "#fffdf8",
+    borderWidth: 1,
+    borderColor: "#d5dfd8",
+    minWidth: 150,
   },
   instagramButtonText: {
-    color: "#fff",
+    color: "#9d4e30",
     fontWeight: "700",
     fontSize: 14,
+    textAlign: "center",
   },
   loadingWrap: {
     flex: 1,
