@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  getWatchingUserIds,
-  getWatchedUsersStatus,
-  addWatchingUser,
   removeWatchingUser,
   subscribeToWatchedUsers,
-  getUserByDni,
+  requestContactByDni,
+  subscribeToWatchingUserIds,
 } from "../services/userService";
 import { FirebaseError } from "firebase/app";
 import { WatchedUserStatus } from "../services/userService";
@@ -27,59 +25,62 @@ export function useWatchedUsers(userId: string): UseWatchedUsersReturn {
   const [watchMessage, setWatchMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    getWatchingUserIds(userId).then(setWatchingUserIds);
+    return subscribeToWatchingUserIds(
+      userId,
+      setWatchingUserIds,
+      () => setWatchMessage("No se pudo sincronizar la lista de contactos aprobados.")
+    );
   }, [userId]);
 
   useEffect(() => {
-    getWatchedUsersStatus(watchingUserIds).then(setWatchedUsers);
-  }, [watchingUserIds]);
-
-  useEffect(() => {
+    setWatchedUsers((previous) => previous.filter((user) => watchingUserIds.includes(user.uid)));
     if (watchingUserIds.length === 0) return;
-    const unsubscribe = subscribeToWatchedUsers(watchingUserIds, (updatedUser) =>
-      setWatchedUsers((prev) => [
-        ...prev.filter((u) => u.uid !== updatedUser.uid),
+    return subscribeToWatchedUsers(
+      watchingUserIds,
+      (updatedUser) => setWatchedUsers((previous) => [
+        ...previous.filter((user) => user.uid !== updatedUser.uid),
         updatedUser,
-      ])
+      ]),
+      () => setWatchMessage("Se revocó el acceso a uno de tus contactos.")
     );
-    return unsubscribe;
   }, [watchingUserIds]);
 
-  const addWatchedUser = useCallback(
-    async (dni: string) => {
-      const normalizedDni = dni.trim();
-      setWatchMessage(null);
-      if (!normalizedDni) {
-        setWatchMessage("Ingresa el DNI del usuario a seguir.");
-        return;
-      }
-      try {
-        setAddingWatch(true);
-        const result = await getUserByDni(normalizedDni);
-        const targetUserId = result ? result.uid : `dni:${normalizedDni}`;
-        if (targetUserId === userId) {
-          setWatchMessage("No puedes agregarte a ti mismo.");
-          return;
-        }
-        if (watchingUserIds.includes(targetUserId)) {
-          setWatchMessage("Ese usuario ya está en tu lista.");
-          return;
-        }
-        await addWatchingUser(userId, targetUserId);
-        setWatchingUserIds((prev) => [...prev, targetUserId]);
-        setWatchMessage(result ? "Usuario agregado correctamente." : "Usuario sin Cuenta agregado correctamente.");
-      } catch (error) {
-        const message =
-          error instanceof FirebaseError && error.code === "permission-denied"
-            ? "Firebase no permite consultar usuarios. Revisa las reglas de Firestore."
-            : "No se pudo agregar al usuario. Revisa tu conexión e inténtalo de nuevo.";
-        setWatchMessage(message);
-      } finally {
-        setAddingWatch(false);
-      }
-    },
-    [userId, watchingUserIds]
-  );
+  const addWatchedUser = useCallback(async (dni: string) => {
+    const normalizedDni = dni.trim().replace(/\D/g, "");
+    setWatchMessage(null);
+    if (!normalizedDni) {
+      setWatchMessage("Ingresa el DNI de la persona que quieres agregar.");
+      return;
+    }
+
+    try {
+      setAddingWatch(true);
+      const result = await requestContactByDni(normalizedDni, userId);
+      setWatchMessage(result === "restored"
+        ? "Este contacto ya te había autorizado. Se restauró en tu lista persistente."
+        : "Solicitud enviada. Cuando la aprueben, verás aquí el estado y teléfono compartidos.");
+    } catch (error) {
+      const firebaseCode = error instanceof FirebaseError ? error.code : "unknown";
+      const message = error instanceof Error && error.message === "INVALID_DNI"
+        ? "El DNI debe tener 7 u 8 números."
+        : error instanceof Error && error.message === "USER_NOT_FOUND"
+          ? "No encontramos un usuario registrado con ese DNI."
+          : error instanceof Error && error.message === "INVALID_TARGET"
+            ? "No puedes agregarte a ti mismo."
+            : error instanceof Error && error.message === "REQUEST_ALREADY_EXISTS"
+              ? "Ya enviaste una solicitud a este usuario."
+              : error instanceof Error && error.message === "CONTACT_ALREADY_EXISTS"
+                ? "Este usuario ya está en tus contactos."
+                : error instanceof Error && error.message === "REQUEST_REJECTED"
+                  ? "La solicitud anterior fue rechazada. Pídele a esa persona que vuelva a aprobar el contacto."
+                : firebaseCode === "permission-denied"
+                  ? "Firestore no permitió crear la solicitud. Revisa las reglas publicadas."
+                  : `No se pudo agregar al usuario (${firebaseCode}). Revisa tu conexión e inténtalo de nuevo.`;
+      setWatchMessage(message);
+    } finally {
+      setAddingWatch(false);
+    }
+  }, [userId]);
 
   const removeWatchedUser = useCallback(
     async (targetUserId: string) => {

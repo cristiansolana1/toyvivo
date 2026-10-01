@@ -1,32 +1,45 @@
-import { collection, addDoc, setDoc, doc, serverTimestamp, writeBatch } from "firebase/firestore";
+import { doc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "../firebase";
 import { HeartbeatEntry } from "../types";
 import { 
   saveHeartbeat as saveLocalHeartbeat, 
   loadLastHeartbeat as loadLocalLastHeartbeat,
+  loadUserProfile,
   addPendingHeartbeat,
   getPendingHeartbeats,
   clearPendingHeartbeats,
   removePendingHeartbeat,
 } from "../storage";
 
+async function persistHeartbeat(uid: string, heartbeat: HeartbeatEntry): Promise<void> {
+  const batch = writeBatch(db);
+  const heartbeatRef = doc(db, "users", uid, "heartbeats", heartbeat.id);
+  const userRef = doc(db, "users", uid);
+
+  batch.set(heartbeatRef, {
+    status: heartbeat.status,
+    createdAt: serverTimestamp(),
+    deviceCreatedAt: heartbeat.createdAt,
+  });
+  batch.set(userRef, { lastAliveAt: serverTimestamp() }, { merge: true });
+
+  const profile = await loadUserProfile(uid);
+  if (profile) {
+    batch.set(doc(db, "userStatus", uid), {
+      fullName: profile.fullName,
+      phone: profile.phone,
+      lastAliveAt: serverTimestamp(),
+    }, { merge: true });
+  }
+
+  await batch.commit();
+}
+
 export async function sendHeartbeat(uid: string, heartbeat: HeartbeatEntry): Promise<{ success: boolean; queued: boolean }> {
   await saveLocalHeartbeat(uid, heartbeat);
   
   try {
-    await addDoc(collection(db, "users", uid, "heartbeats"), {
-      status: heartbeat.status,
-      createdAt: serverTimestamp(),
-      deviceCreatedAt: heartbeat.createdAt,
-    });
-    await setDoc(
-      doc(db, "users", uid),
-      {
-        emailNormalized: "",
-        lastAliveAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+    await persistHeartbeat(uid, heartbeat);
     return { success: true, queued: false };
   } catch (error) {
     console.error("sendHeartbeat error:", error);
@@ -44,19 +57,7 @@ export async function syncPendingHeartbeats(uid: string): Promise<{ synced: numb
 
   for (const heartbeat of pending) {
     try {
-      await addDoc(collection(db, "users", uid, "heartbeats"), {
-        status: heartbeat.status,
-        createdAt: serverTimestamp(),
-        deviceCreatedAt: heartbeat.createdAt,
-      });
-      await setDoc(
-        doc(db, "users", uid),
-        {
-          emailNormalized: "",
-          lastAliveAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
+      await persistHeartbeat(uid, heartbeat);
       await removePendingHeartbeat(uid, heartbeat.id);
       synced++;
     } catch (error) {

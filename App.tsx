@@ -10,7 +10,8 @@ import {
 } from "firebase/auth";
 import { getDoc, doc } from "firebase/firestore";
 import { auth, db } from "./src/firebase";
-import { loadUserProfile, saveUserProfile } from "./src/storage";
+import { loadUserProfile } from "./src/storage";
+import { saveUserProfile } from "./src/services/userService";
 import { UserProfile } from "./src/types";
 import { FIXED_COUNTRY } from "./src/constants";
 import { AuthScreen } from "./src/screens/AuthScreen";
@@ -21,6 +22,8 @@ import { ErrorBoundary } from "./src/components/ErrorBoundary";
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [bootLoading, setBootLoading] = useState(true);
   const [bootError, setBootError] = useState<string | null>(null);
 
@@ -57,46 +60,81 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+
     async function hydrateProfile(currentUser: User | null) {
       if (!currentUser) {
-        setProfile(null);
+        if (active) {
+          setProfile(null);
+          setProfileError(null);
+          setProfileLoading(false);
+        }
         return;
       }
 
-      const localProfile = await loadUserProfile(currentUser.uid);
-      if (localProfile) {
-        setProfile(localProfile);
-        return;
-      }
-
-      const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-      const publicProfile = userDoc.data()?.publicProfile as
-        | Pick<UserProfile, "fullName" | "dni" | "phone" | "country" | "province" | "birthDate">
-        | undefined;
-      const legacyProfile = userDoc.data()?.profile as UserProfile | undefined;
-      const cloudProfile: UserProfile | null = publicProfile
-        ? {
-            fullName: publicProfile.fullName,
-            dni: publicProfile.dni,
-            phone: publicProfile.phone,
-            country: publicProfile.country ?? FIXED_COUNTRY,
-            province: publicProfile.province ?? "BA",
-            birthDate: publicProfile.birthDate ?? "",
+      setProfileLoading(true);
+      setProfileError(null);
+      try {
+        const localProfile = await loadUserProfile(currentUser.uid);
+        if (!active) return;
+        if (localProfile) {
+          setProfile(localProfile);
+          try {
+            await saveUserProfile(currentUser.uid, localProfile, currentUser.email);
+          } catch {
+            // Keep the cached profile usable; a later startup can retry cloud migration.
           }
-        : legacyProfile
-          ? legacyProfile
-          : null;
+          return;
+        }
 
-      if (cloudProfile) {
-        await saveUserProfile(currentUser.uid, cloudProfile);
-        setProfile(cloudProfile);
-        return;
+        const privateDoc = await getDoc(doc(db, "users", currentUser.uid, "private", "profile"));
+        const userDoc = privateDoc.exists()
+          ? null
+          : await getDoc(doc(db, "users", currentUser.uid));
+        if (!active) return;
+
+        const privateProfile = privateDoc.data() as UserProfile | undefined;
+        const publicProfile = userDoc?.data()?.publicProfile as
+          | Pick<UserProfile, "fullName" | "dni" | "phone" | "country" | "province" | "birthDate">
+          | undefined;
+        const legacyProfile = userDoc?.data()?.profile as UserProfile | undefined;
+        const cloudProfile: UserProfile | null = privateProfile
+          ? privateProfile
+          : publicProfile
+            ? {
+                fullName: publicProfile.fullName,
+                dni: publicProfile.dni,
+                phone: publicProfile.phone,
+                country: publicProfile.country ?? FIXED_COUNTRY,
+                province: publicProfile.province ?? "BA",
+                birthDate: publicProfile.birthDate ?? "",
+              }
+            : legacyProfile ?? null;
+
+        if (cloudProfile) {
+          setProfile(cloudProfile);
+          try {
+            await saveUserProfile(currentUser.uid, cloudProfile, currentUser.email);
+          } catch {
+            if (active) setProfileError("No se pudo actualizar el perfil seguro. Revisa tu conexión.");
+          }
+        } else {
+          setProfile(null);
+        }
+      } catch {
+        if (active) {
+          setProfile(null);
+          setProfileError("No se pudo cargar tu perfil. Revisa tu conexión e inténtalo de nuevo.");
+        }
+      } finally {
+        if (active) setProfileLoading(false);
       }
-
-      setProfile(null);
     }
 
     void hydrateProfile(user);
+    return () => {
+      active = false;
+    };
   }, [user]);
 
 if (bootLoading) {
@@ -119,12 +157,21 @@ if (bootLoading) {
             <AuthScreen
               onAccountCreated={(createdUser) => {
                 setProfile(null);
+                setProfileError(null);
                 setUser(createdUser);
               }}
             />
           </>
+        ) : profileLoading ? (
+          <View style={styles.loaderWrap}>
+            <SkeletonLoader variant="card" width={150} height={100} animated={true} />
+            <Text style={styles.subtitle}>Cargando tu perfil...</Text>
+          </View>
         ) : !profile ? (
+          <>
+            {profileError ? <Text style={styles.errorText}>{profileError}</Text> : null}
           <ProfileSetupScreen user={user} onSaved={setProfile} />
+          </>
         ) : (
           <HomeScreen
             user={user}

@@ -2,8 +2,7 @@ import { useState } from "react";
 import { useToast } from "../hooks/useToast";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { setDoc, doc, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase";
+import { User } from "firebase/auth";
 import { saveUserProfile } from "../services/userService";
 import { UserProfile } from "../types";
 import { PROVINCES_AR, FIXED_COUNTRY, FIXED_COUNTRY_LABEL } from "../constants";
@@ -14,7 +13,7 @@ export function ProfileSetupScreen({
   user,
   onSaved,
 }: {
-  user: any;
+  user: User;
   onSaved: (profile: UserProfile) => void;
 }) {
   const [fullName, setFullName] = useState("");
@@ -45,23 +44,7 @@ export function ProfileSetupScreen({
 
     try {
       setSaving(true);
-      await saveUserProfile(user.uid, profile);
-      await setDoc(
-        doc(db, "users", user.uid),
-        {
-          publicProfile: {
-            fullName: profile.fullName,
-            dni: profile.dni,
-            phone: profile.phone,
-            country: profile.country,
-            province: profile.province,
-            birthDate: profile.birthDate,
-          },
-          emailNormalized: user.email?.toLowerCase() ?? "",
-          profileUpdatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
+      await saveUserProfile(user.uid, profile, user.email);
       showToast({ text: "Tus datos se guardaron correctamente.", type: "success" });
       onSaved(profile);
     } catch (error) {

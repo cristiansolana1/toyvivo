@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import NetInfo from "@react-native-community/netinfo";
 import { sendHeartbeat, loadLastHeartbeat, syncPendingHeartbeats, getPendingHeartbeats } from "../services/heartbeatService";
 import { HeartbeatEntry } from "../types";
@@ -24,6 +24,7 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [pendingCount, setPendingCount] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
+  const isOnlineRef = useRef(true);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(Date.now()), 60 * 1000);
@@ -31,21 +32,17 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
   }, []);
 
   useEffect(() => {
-    loadLastHeartbeat(userId).then(setLastHeartbeat);
-    getPendingHeartbeats(userId).then((pending: HeartbeatEntry[]) => setPendingCount(pending.length));
-  }, [userId]);
-
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener((state) => {
-      const wasOffline = !isOnline;
-      const nowOnline = state.isConnected === true;
-      setIsOnline(nowOnline);
-      if (wasOffline && nowOnline && pendingCount > 0) {
-        syncPending();
-      }
+    let active = true;
+    loadLastHeartbeat(userId).then((value) => {
+      if (active) setLastHeartbeat(value);
     });
-    return unsubscribe;
-  }, [userId, pendingCount]);
+    getPendingHeartbeats(userId).then((pending: HeartbeatEntry[]) => {
+      if (active) setPendingCount(pending.length);
+    });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
 
   const handleHeartbeat = useCallback(async () => {
     const heartbeat: HeartbeatEntry = {
@@ -80,6 +77,19 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
       setSending(false);
     }
   }, [userId, pendingCount]);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const wasOffline = !isOnlineRef.current;
+      const nowOnline = state.isConnected === true;
+      isOnlineRef.current = nowOnline;
+      setIsOnline(nowOnline);
+      if (wasOffline && nowOnline && pendingCount > 0) {
+        void syncPending();
+      }
+    });
+    return unsubscribe;
+  }, [userId, pendingCount, syncPending]);
 
   useEffect(() => {
     const updatePending = async () => {

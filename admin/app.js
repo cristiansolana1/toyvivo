@@ -3,10 +3,12 @@ import {
   getAuth,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  sendEmailVerification,
   signOut,
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import {
   addDoc,
+  deleteField,
   collection,
   getDocs,
   getFirestore,
@@ -59,7 +61,6 @@ const loginForm = document.querySelector("#login-form");
 const loginError = document.querySelector("#login-error");
 const dashboardMessage = document.querySelector("#dashboard-message");
 const userCount = document.querySelector("#user-count");
-const latestUser = document.querySelector("#latest-user");
 const refreshButton = document.querySelector("#refresh-button");
 const logoutButton = document.querySelector("#logout-button");
 const surveyForm = document.querySelector("#survey-form");
@@ -227,6 +228,19 @@ function formatChartDate(date) {
   return date.toLocaleDateString("es-ES", { month: "short", day: "numeric" });
 }
 
+function formatLocalDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatLocalDateTime(date) {
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${formatLocalDate(date)}T${hours}:${minutes}`;
+}
+
 // ===== DATETIME PICKER =====
 let datetimePickerTarget = null;
 let datetimePickerDate = new Date();
@@ -296,22 +310,22 @@ function renderDateTimePicker() {
   const prevMonthDays = new Date(year, month, 0).getDate();
   
   const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
+  const todayStr = formatLocalDate(today);
   
-  const selectedStr = datetimePickerTarget?.value ? new Date(datetimePickerTarget.value).toISOString().split("T")[0] : "";
+  const selectedStr = datetimePickerTarget?.value ? formatLocalDate(new Date(datetimePickerTarget.value)) : "";
   
   let daysHtml = "";
   
   // Previous month days
   for (let i = startDay - 1; i >= 0; i--) {
     const day = prevMonthDays - i;
-    const dateStr = new Date(year, month - 1, day).toISOString().split("T")[0];
+    const dateStr = formatLocalDate(new Date(year, month - 1, day));
     daysHtml += `<button type="button" class="datetime-picker-day other-month" data-date="${dateStr}">${day}</button>`;
   }
   
   // Current month days
   for (let day = 1; day <= daysInMonth; day++) {
-    const dateStr = new Date(year, month, day).toISOString().split("T")[0];
+    const dateStr = formatLocalDate(new Date(year, month, day));
     const isToday = dateStr === todayStr;
     const isSelected = dateStr === selectedStr;
     let classes = "datetime-picker-day";
@@ -324,7 +338,7 @@ function renderDateTimePicker() {
   const totalCells = startDay + daysInMonth;
   const nextMonthDays = (7 - (totalCells % 7)) % 7;
   for (let day = 1; day <= nextMonthDays; day++) {
-    const dateStr = new Date(year, month + 1, day).toISOString().split("T")[0];
+    const dateStr = formatLocalDate(new Date(year, month + 1, day));
     daysHtml += `<button type="button" class="datetime-picker-day other-month" data-date="${dateStr}">${day}</button>`;
   }
   
@@ -371,8 +385,7 @@ function renderDateTimePicker() {
   
   // Confirm button
   document.querySelector("#datetime-picker-confirm").onclick = () => {
-    const isoString = datetimePickerDate.toISOString().slice(0, 16);
-    datetimePickerTarget.value = isoString;
+    datetimePickerTarget.value = formatLocalDateTime(datetimePickerDate);
     updateTriggerDisplay(datetimePickerTarget);
     closeDateTimePicker();
   };
@@ -399,7 +412,7 @@ function updateTriggerDisplay(input) {
 function formatDateTimeForInput(timestamp) {
   if (!timestamp?.toDate) return "";
   const date = timestamp.toDate();
-  return date.toISOString().slice(0, 16);
+  return formatLocalDateTime(date);
 }
 
 function getWeekStart(date) {
@@ -442,35 +455,11 @@ function aggregateResponsesByTime(responses, granularity = "day") {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-async function loadSurveyTimeSeries(surveyId, granularity = "day") {
-  let responsesSnapshot;
-  try {
-    responsesSnapshot = await getDocs(
-      query(collection(db, "surveys", surveyId, "responses"), orderBy("answeredAt", "asc"))
-    );
-  } catch (indexError) {
-    console.warn("Index missing for answeredAt in time series, falling back:", indexError);
-    responsesSnapshot = await getDocs(collection(db, "surveys", surveyId, "responses"));
-  }
-  
-  const responses = responsesSnapshot.docs;
-  const aggregated = aggregateResponsesByTime(responses, granularity);
-  
-  return aggregated;
-}
-
-function renderTimeSeriesChart(container, data, options, granularity = "day") {
+function renderTimeSeriesChart(container, data, options, granularity = "day", responses = []) {
   if (data.length === 0) {
     container.innerHTML = '<p class="message">No hay datos de series temporales disponibles.</p>';
     return;
   }
-  
-  const maxTotal = Math.max(...data.map(d => d.total));
-  const maxPerOption = new Map();
-  options.forEach(opt => {
-    const max = Math.max(...data.map(d => d.byOption.get(opt) || 0));
-    maxPerOption.set(opt, max);
-  });
   
   const chartHtml = `
     <div class="timeseries-chart">
@@ -519,10 +508,10 @@ function renderTimeSeriesChart(container, data, options, granularity = "day") {
   container.innerHTML = chartHtml;
   
   container.querySelectorAll('input[name="timeseries-granularity"]').forEach(input => {
-    input.addEventListener("change", async (e) => {
+    input.addEventListener("change", (e) => {
       const newGranularity = e.target.value;
-      const newData = await loadSurveyTimeSeries(container.dataset.surveyId, newGranularity);
-      renderTimeSeriesChart(container, newData, options, newGranularity);
+      const newData = aggregateResponsesByTime(responses, newGranularity);
+      renderTimeSeriesChart(container, newData, options, newGranularity, responses);
     });
   });
 }
@@ -538,36 +527,78 @@ function getSurveyStatus(survey) {
   return { text: "Activa", class: "status-active" };
 }
 
+function countEligibleUsers(userDocs, survey) {
+  return userDocs.filter((userDoc) => {
+    const data = userDoc.data();
+    const profile = data.publicProfile || data.profile;
+    if (!profile) return false;
+    if (survey.targetCountry && profile.country !== survey.targetCountry) return false;
+    if (survey.targetProvince && profile.province !== survey.targetProvince) return false;
+    return true;
+  }).length;
+}
+
+async function mapWithConcurrency(items, concurrency, mapItem) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  let hasError = false;
+  let firstError;
+  const workerCount = Math.min(items.length, concurrency);
+
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (!hasError && nextIndex < items.length) {
+      const index = nextIndex++;
+      try {
+        results[index] = await mapItem(items[index], index);
+      } catch (error) {
+        if (!hasError) {
+          hasError = true;
+          firstError = error;
+        }
+      }
+    }
+  }));
+
+  if (hasError) throw firstError;
+  return results;
+}
+
+async function loadSurveySummaries() {
+  const snapshot = await getDocs(collection(db, "surveys"));
+  const surveys = await mapWithConcurrency(snapshot.docs, 4, async (surveyDoc) => {
+    const data = surveyDoc.data();
+    const options = Array.isArray(data.options) ? data.options : [];
+    const responsesSnapshot = await getDocs(collection(db, "surveys", surveyDoc.id, "responses"));
+    const counts = new Map(options.map(option => [option, 0]));
+
+    responsesSnapshot.docs.forEach(responseDoc => {
+      const answer = responseDoc.data().answer;
+      if (counts.has(answer)) counts.set(answer, counts.get(answer) + 1);
+    });
+
+    return {
+      id: surveyDoc.id,
+      question: data.question ?? "Encuesta sin pregunta",
+      options,
+      targetCountry: data.targetCountry,
+      targetProvince: data.targetProvince,
+      active: data.active ?? true,
+      startAt: data.startAt,
+      endAt: data.endAt,
+      createdAt: data.createdAt,
+      createdBy: data.createdBy,
+      totalResponses: responsesSnapshot.size,
+      counts: [...counts.entries()],
+    };
+  });
+
+  return surveys.sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+}
+
 async function loadSurveyResults() {
   try {
     showSkeleton(surveyResults, 3, "card");
-    const snapshot = await getDocs(collection(db, "surveys"));
-    const surveys = await Promise.all(snapshot.docs.map(async (surveyDoc) => {
-      const data = surveyDoc.data();
-      const responsesSnapshot = await getDocs(collection(db, "surveys", surveyDoc.id, "responses"));
-      const counts = new Map((Array.isArray(data.options) ? data.options : []).map((option) => [option, 0]));
-
-      responsesSnapshot.docs.forEach((responseDoc) => {
-        const answer = responseDoc.data().answer;
-        if (counts.has(answer)) {
-          counts.set(answer, counts.get(answer) + 1);
-        }
-      });
-
-      return {
-        id: surveyDoc.id,
-        question: data.question ?? "Encuesta sin pregunta",
-        options: data.options ?? [],
-        active: data.active ?? true,
-        startAt: data.startAt,
-        endAt: data.endAt,
-        createdAt: data.createdAt,
-        totalResponses: responsesSnapshot.size,
-        counts: [...counts.entries()],
-      };
-    }));
-
-    surveys.sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+    const surveys = await loadSurveySummaries();
     surveyResults.replaceChildren();
 
     if (surveys.length === 0) {
@@ -666,7 +697,6 @@ async function loadDashboard() {
   dashboardMessage.textContent = "Actualizando datos...";
   try {
     const snapshot = await getDocs(collection(db, "users"));
-    console.log("[Admin] Users snapshot:", snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     
     // Contar solo usuarios con perfil (publicProfile o profile)
     const usersWithProfile = snapshot.docs.filter(doc => {
@@ -674,18 +704,6 @@ async function loadDashboard() {
       return data.publicProfile || data.profile;
     });
     userCount.textContent = usersWithProfile.length;
-
-    const latest = snapshot.docs
-      .map((userDoc) => ({ id: userDoc.id, ...userDoc.data() }))
-      .filter((userData) => userData.lastAliveAt)
-      .sort((a, b) => b.lastAliveAt.toMillis() - a.lastAliveAt.toMillis())[0];
-
-    if (!latest) {
-      latestUser.innerHTML = "Sin avisos registrados<small>Ningún usuario ha pulsado “Estoy bien” todavía.</small>";
-    } else {
-      const name = latest.publicProfile?.fullName ?? latest.profile?.fullName ?? "Usuario sin Cuenta";
-      latestUser.innerHTML = `${name}<small>${formatDate(latest.lastAliveAt)}</small>`;
-    }
     await loadSurveyResults();
     dashboardMessage.textContent = `Actualizado: ${new Date().toLocaleTimeString("es-ES")}`;
   } catch (error) {
@@ -706,9 +724,14 @@ loginForm.addEventListener("submit", async (event) => {
   const password = document.querySelector("#password").value;
   try {
     const credential = await signInWithEmailAndPassword(auth, email, password);
-    if (credential.user.email?.toLowerCase() !== ADMIN_EMAIL) {
+    if (credential.user.email?.toLowerCase() === ADMIN_EMAIL && !credential.user.emailVerified) {
+      try {
+        await sendEmailVerification(credential.user);
+        loginError.textContent = "Esta cuenta aún no está verificada. Enviamos un enlace a tu correo; ábrelo y vuelve a iniciar sesión.";
+      } catch (error) {
+        loginError.textContent = `No se pudo enviar el enlace de verificación (${error.code ?? "error desconocido"}).`;
+      }
       await signOut(auth);
-      loginError.textContent = "Esta cuenta no tiene acceso al panel.";
     }
   } catch (error) {
     loginError.textContent = authMessage(error);
@@ -721,7 +744,11 @@ refreshButton.addEventListener("click", () => {
   });
 });
 
-logoutButton.addEventListener("click", () => void signOut(auth));
+logoutButton.addEventListener("click", () => {
+  void signOut(auth).catch((error) => {
+    dashboardMessage.textContent = `No se pudo cerrar sesión: ${error.message}`;
+  });
+});
 
 addOptionButton.addEventListener("click", () => {
   const optionCount = surveyOptions.querySelectorAll(".survey-option").length;
@@ -781,23 +808,34 @@ surveyForm.addEventListener("submit", async (event) => {
 });
 
 onAuthStateChanged(auth, async (user) => {
-  if (user && user.email?.toLowerCase() !== ADMIN_EMAIL) {
-    await signOut(auth);
-    loginError.textContent = "Esta cuenta no tiene acceso al panel.";
+  const isVerifiedAdmin = Boolean(
+    user?.emailVerified && user.email?.toLowerCase() === ADMIN_EMAIL
+  );
+  loginView.hidden = isVerifiedAdmin;
+  dashboardView.hidden = true;
+  logoutButton.hidden = !isVerifiedAdmin;
+  if (!user) {
     return;
   }
 
-  loginView.hidden = Boolean(user);
-  dashboardView.hidden = !user;
-  logoutButton.hidden = !user;
-  if (user) {
-    try {
-      await loadDashboard();
-      initMainSurveyPickers();
-      setupSidebarNavigation();
-    } catch {
-      dashboardMessage.textContent = "No se pudieron cargar los datos. Revisa los permisos de Firestore.";
+  if (!user.emailVerified) return;
+
+  try {
+    const token = await user.getIdTokenResult();
+    if (user.email?.toLowerCase() !== ADMIN_EMAIL || token.claims.email_verified !== true) {
+      throw new Error("Usa la cuenta administradora con el correo verificado.");
     }
+
+    loginView.hidden = true;
+    dashboardView.hidden = false;
+    await loadDashboard();
+    initMainSurveyPickers();
+    setupSidebarNavigation();
+  } catch (error) {
+    await signOut(auth);
+    loginError.textContent = error instanceof Error
+      ? error.message
+      : "No se pudo verificar el acceso administrativo.";
   }
 });
 
@@ -877,57 +915,113 @@ function setupSidebarNavigation() {
 }
 
 // Load users table
+let allUsers = [];
+let filteredUsers = [];
+let currentUserPage = 1;
+const userPageSize = 25;
+
+function updateUsersPagination() {
+  const pagination = document.querySelector("#users-pagination");
+  const pageInfo = document.querySelector("#users-page-info");
+  const prevButton = pagination.querySelector('[data-page="prev"]');
+  const nextButton = pagination.querySelector('[data-page="next"]');
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / userPageSize));
+
+  pagination.hidden = totalPages === 1;
+  pageInfo.textContent = `Página ${currentUserPage} de ${totalPages}`;
+  prevButton.disabled = currentUserPage === 1;
+  nextButton.disabled = currentUserPage === totalPages;
+}
+
+function renderUsersTable() {
+  const tbody = document.querySelector("#users-tbody");
+  const start = (currentUserPage - 1) * userPageSize;
+  const pageUsers = filteredUsers.slice(start, start + userPageSize);
+
+  if (pageUsers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="loading-cell">No se encontraron usuarios.</td></tr>';
+    updateUsersPagination();
+    return;
+  }
+
+  tbody.innerHTML = pageUsers.map(user => {
+    const profile = user.publicProfile || user.profile;
+    const name = profile?.fullName || "Sin nombre";
+    const email = user.emailNormalized || user.email || profile?.email || "Sin email";
+    const lastAlive = user.lastAliveAt ? formatDate(user.lastAliveAt) : "Nunca";
+    const hasProfile = profile ? "Completo" : "Pendiente";
+
+    return `
+      <tr data-user-id="${escapeHtml(user.id)}">
+        <td>
+          <div class="user-cell">
+            <span class="user-name">${escapeHtml(name)}</span>
+            <span class="user-email">${escapeHtml(email)}</span>
+          </div>
+        </td>
+        <td>${escapeHtml(email)}</td>
+        <td>${lastAlive}</td>
+        <td><span class="status-badge ${hasProfile === "Completo" ? "active" : "pending"}">${hasProfile}</span></td>
+        <td>
+          <div class="action-btns">
+            <button class="action-btn secondary-btn view-user-btn" title="Ver detalle">👁️</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  tbody.querySelectorAll(".view-user-btn").forEach(button => {
+    button.addEventListener("click", (event) => {
+      const userId = event.currentTarget.closest("tr")?.dataset.userId;
+      const user = allUsers.find(candidate => candidate.id === userId);
+      if (user) openUserModal(user);
+    });
+  });
+
+  updateUsersPagination();
+}
+
+function applyUserSearch() {
+  const search = document.querySelector("#user-search").value.trim().toLocaleLowerCase("es");
+  filteredUsers = allUsers.filter(user => {
+    const profile = user.publicProfile || user.profile || {};
+    const email = user.emailNormalized || user.email || profile.email || "";
+    return `${profile.fullName || ""} ${email}`.toLocaleLowerCase("es").includes(search);
+  });
+  currentUserPage = 1;
+  renderUsersTable();
+}
+
+document.querySelector("#user-search").addEventListener("input", applyUserSearch);
+document.querySelector("#users-pagination").querySelector('[data-page="prev"]').addEventListener("click", () => {
+  if (currentUserPage > 1) {
+    currentUserPage--;
+    renderUsersTable();
+  }
+});
+document.querySelector("#users-pagination").querySelector('[data-page="next"]').addEventListener("click", () => {
+  const totalPages = Math.ceil(filteredUsers.length / userPageSize);
+  if (currentUserPage < totalPages) {
+    currentUserPage++;
+    renderUsersTable();
+  }
+});
+
 async function loadUsersTable() {
   const tbody = document.querySelector("#users-tbody");
   const tableContainer = document.querySelector("#view-users .table-container");
   showSkeleton(tbody, 5, "table");
-  
+
   try {
     const snapshot = await getDocs(collection(db, "users"));
-    const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    
-    // Filter users with profile
-    const usersWithProfile = users.filter(u => u.publicProfile || u.profile);
-    
-    tbody.innerHTML = usersWithProfile.map(user => {
-      const profile = user.publicProfile || user.profile;
-      const name = profile?.fullName || "Sin nombre";
-      const email = user.emailNormalized || user.email || profile?.email || "Sin email";
-      const lastAlive = user.lastAliveAt ? formatDate(user.lastAliveAt) : "Nunca";
-      const hasProfile = profile ? "Completo" : "Pendiente";
-      
-      return `
-        <tr data-user-id="${user.id}">
-          <td>
-            <div class="user-cell">
-              <span class="user-name">${escapeHtml(name)}</span>
-              <span class="user-email">${escapeHtml(email)}</span>
-            </div>
-          </td>
-          <td>${escapeHtml(email)}</td>
-          <td>${lastAlive}</td>
-          <td><span class="status-badge ${hasProfile === "Completo" ? "active" : "pending"}">${hasProfile}</span></td>
-          <td>
-            <div class="action-btns">
-              <button class="action-btn secondary-btn view-user-btn" title="Ver detalle">👁️</button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join("");
-    
-    // Update badge
+    allUsers = snapshot.docs
+      .map(userDoc => ({ id: userDoc.id, ...userDoc.data() }))
+      .filter(user => user.publicProfile || user.profile);
+
     const badge = document.querySelector("#users-badge");
-    if (badge) badge.textContent = usersWithProfile.length;
-    
-    // Attach click handlers
-    tbody.querySelectorAll(".view-user-btn").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        const row = e.target.closest("tr");
-        const user = usersWithProfile.find(u => u.id === row.dataset.userId);
-        if (user) openUserModal(user);
-      });
-    });
+    if (badge) badge.textContent = allUsers.length;
+    applyUserSearch();
   } catch (error) {
     console.error("[ErrorBoundary] loadUsersTable:", error);
     showErrorBoundary(tableContainer || tbody, error, `
@@ -947,33 +1041,7 @@ async function loadResultsView() {
   showSkeleton(container, 3, "card");
   
   try {
-    const snapshot = await getDocs(collection(db, "surveys"));
-    const surveys = await Promise.all(snapshot.docs.map(async (surveyDoc) => {
-      const data = surveyDoc.data();
-      const responsesSnapshot = await getDocs(collection(db, "surveys", surveyDoc.id, "responses"));
-      const counts = new Map((Array.isArray(data.options) ? data.options : []).map((option) => [option, 0]));
-      
-      responsesSnapshot.docs.forEach((responseDoc) => {
-        const answer = responseDoc.data().answer;
-        if (counts.has(answer)) {
-          counts.set(answer, counts.get(answer) + 1);
-        }
-      });
-      
-      return {
-        id: surveyDoc.id,
-        question: data.question ?? "Encuesta sin pregunta",
-        options: data.options ?? [],
-        active: data.active ?? true,
-        startAt: data.startAt,
-        endAt: data.endAt,
-        createdAt: data.createdAt,
-        totalResponses: responsesSnapshot.size,
-        counts: [...counts.entries()],
-      };
-    }));
-    
-    surveys.sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+    const surveys = await loadSurveySummaries();
     
     if (surveys.length === 0) {
       container.innerHTML = '<p class="message">Todavía no hay encuestas publicadas.</p>';
@@ -981,13 +1049,9 @@ async function loadResultsView() {
     }
     
     const usersSnapshot = await getDocs(collection(db, "users"));
-    const eligibleUsers = usersSnapshot.docs.filter(doc => {
-      const data = doc.data();
-      return data.publicProfile || data.profile;
-    }).length;
-    
     container.innerHTML = surveys.map(survey => {
       const status = getSurveyStatus(survey);
+      const eligibleUsers = countEligibleUsers(usersSnapshot.docs, survey);
       const responseRate = eligibleUsers > 0 ? ((survey.totalResponses / eligibleUsers) * 100).toFixed(1) : 0;
       
       return `
@@ -1143,17 +1207,21 @@ document.querySelector("#user-modal-close").addEventListener("click", closeUserM
 document.querySelector("#user-modal").querySelector(".modal-backdrop").addEventListener("click", closeUserModal);
 
 // ===== RESULTS MODAL =====
-let currentResultsSurvey = null;
+let resultsModalRequestId = 0;
 
 async function openResultsModal(survey) {
-  currentResultsSurvey = survey;
+  const requestId = ++resultsModalRequestId;
   const modal = document.querySelector("#results-modal");
   const title = document.querySelector("#results-modal-title");
   const content = document.querySelector("#results-modal-content");
+  const exportPdfButton = document.querySelector("#export-pdf-btn");
   const exportBtn = document.querySelector("#export-csv-btn");
   
   title.textContent = `Resultados: ${survey.question}`;
-  exportBtn.disabled = false;
+  exportPdfButton.disabled = true;
+  exportPdfButton.onclick = null;
+  exportBtn.disabled = true;
+  exportBtn.onclick = null;
   exportBtn.dataset.surveyId = survey.id;
   exportBtn.dataset.surveyQuestion = survey.question;
   
@@ -1162,16 +1230,17 @@ async function openResultsModal(survey) {
   document.body.style.overflow = "hidden";
   
   try {
-    let responsesSnapshot;
-    try {
-      responsesSnapshot = await getDocs(
-        query(collection(db, "surveys", survey.id, "responses"), orderBy("answeredAt", "asc"))
-      );
-    } catch (indexError) {
-      // Fallback: try without orderBy if index is missing
-      console.warn("Index missing for answeredAt, falling back to unordered query:", indexError);
-      responsesSnapshot = await getDocs(collection(db, "surveys", survey.id, "responses"));
-    }
+    const responsesRequest = getDocs(
+      query(collection(db, "surveys", survey.id, "responses"), orderBy("answeredAt", "asc"))
+    ).catch((queryError) => {
+      console.warn("Could not order responses; retrying without orderBy:", queryError);
+      return getDocs(collection(db, "surveys", survey.id, "responses"));
+    });
+    const [responsesSnapshot, usersSnapshot] = await Promise.all([
+      responsesRequest,
+      getDocs(collection(db, "users")),
+    ]);
+    if (requestId !== resultsModalRequestId) return;
     
     const responses = responsesSnapshot.docs;
     const totalResponses = responses.length;
@@ -1183,17 +1252,38 @@ async function openResultsModal(survey) {
       if (counts.has(ans)) counts.set(ans, counts.get(ans) + 1);
     });
     
-    const usersSnapshot = await getDocs(collection(db, "users"));
-    const eligibleUsers = usersSnapshot.docs.filter(doc => {
-      const data = doc.data();
-      return data.publicProfile || data.profile;
-    }).length;
+    const eligibleUsers = countEligibleUsers(usersSnapshot.docs, survey);
     const responseRate = eligibleUsers > 0 ? ((totalResponses / eligibleUsers) * 100).toFixed(1) : 0;
     
     const timeSeriesContainer = document.createElement("div");
     timeSeriesContainer.dataset.surveyId = survey.id;
     
+    const targetCountry = survey.targetCountry === "AR" ? "Argentina" : survey.targetCountry;
+    const targetProvince = PROVINCES_AR.find(province => province.code === survey.targetProvince)?.label || survey.targetProvince;
+    const targetLabel = targetCountry
+      ? `${targetCountry}${targetProvince ? ` / ${targetProvince}` : ""}`
+      : "Todos los países";
+    const periodLabel = [
+      survey.startAt ? `Desde ${formatDateTime(survey.startAt)}` : "Sin fecha de inicio",
+      survey.endAt ? `hasta ${formatDateTime(survey.endAt)}` : "sin fecha de fin",
+    ].join(" ");
+    const generatedAt = new Intl.DateTimeFormat("es-AR", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date());
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
     content.innerHTML = `
+      <section class="report-meta" aria-label="Datos de la encuesta">
+        <h2>${escapeHtml(survey.question)}</h2>
+        <dl>
+          <div><dt>Estado</dt><dd>${escapeHtml(getSurveyStatus(survey).text)}</dd></div>
+          <div><dt>Creada</dt><dd>${survey.createdAt ? escapeHtml(formatDate(survey.createdAt)) : "—"}</dd></div>
+          <div><dt>Periodo</dt><dd>${escapeHtml(periodLabel)}</dd></div>
+          <div><dt>Destino</dt><dd>${escapeHtml(targetLabel)}</dd></div>
+          <div><dt>Informe generado</dt><dd>${escapeHtml(generatedAt)} (${escapeHtml(timeZone)})</dd></div>
+        </dl>
+      </section>
       <div class="results-summary">
         <div class="results-summary-item">
           <span class="results-summary-label">Total respuestas</span>
@@ -1215,19 +1305,20 @@ async function openResultsModal(survey) {
         </div>
       </div>
       <div class="results-chart" id="results-chart"></div>
+      <table class="report-breakdown">
+        <thead><tr><th>Respuesta</th><th>Cantidad</th><th>Porcentaje</th></tr></thead>
+        <tbody id="results-breakdown"></tbody>
+      </table>
       <div class="timeseries-section" id="timeseries-section"></div>
     `;
     
     const chartContainer = content.querySelector("#results-chart");
-    const countsArray = Array.from(counts.values());
-    const maxCount = countsArray.length > 0 ? Math.max(...countsArray) : 0;
-    
     chartContainer.innerHTML = options.map(opt => {
       const count = counts.get(opt) || 0;
       const pct = totalResponses > 0 ? (count / totalResponses) * 100 : 0;
       return `
         <div class="result-bar">
-          <span class="result-bar-label">${opt}</span>
+          <span class="result-bar-label">${escapeHtml(opt)}</span>
           <div class="result-bar-track">
             <div class="result-bar-fill" style="width: ${pct}%"></div>
           </div>
@@ -1235,11 +1326,20 @@ async function openResultsModal(survey) {
         </div>
       `;
     }).join("");
+
+    content.querySelector("#results-breakdown").innerHTML = options.map(option => {
+      const count = counts.get(option) || 0;
+      const pct = totalResponses > 0 ? (count / totalResponses) * 100 : 0;
+      return `<tr><td>${escapeHtml(option)}</td><td>${count}</td><td>${pct.toFixed(1)}%</td></tr>`;
+    }).join("");
     
-    const timeSeriesData = await loadSurveyTimeSeries(survey.id, "day");
-    renderTimeSeriesChart(timeSeriesContainer, timeSeriesData, options, "day");
+    const timeSeriesData = aggregateResponsesByTime(responses, "day");
+    renderTimeSeriesChart(timeSeriesContainer, timeSeriesData, options, "day", responses);
     content.querySelector("#timeseries-section").appendChild(timeSeriesContainer);
     
+    exportPdfButton.disabled = false;
+    exportPdfButton.onclick = () => printSurveyReport(survey);
+    exportBtn.disabled = false;
     exportBtn.onclick = () => exportSurveyCSV(survey, responses, options, counts);
     
     // Show a message if no responses yet
@@ -1249,14 +1349,29 @@ async function openResultsModal(survey) {
     }
     
   } catch (error) {
+    if (requestId !== resultsModalRequestId) return;
     console.error("Error loading results:", error);
     content.innerHTML = `<p class="message error">Error al cargar resultados: ${error.message}</p>`;
   }
 }
 
+function printSurveyReport(survey) {
+  const previousTitle = document.title;
+  document.title = `Resultados - ${survey.question}`.replace(/[\\/:*?"<>|]/g, "-");
+  window.addEventListener("afterprint", () => {
+    document.title = previousTitle;
+  }, { once: true });
+  window.print();
+}
+
 function closeResultsModal() {
-  currentResultsSurvey = null;
+  resultsModalRequestId++;
   const modal = document.querySelector("#results-modal");
+  document.querySelector("#export-pdf-btn").onclick = null;
+  document.querySelector("#export-pdf-btn").disabled = true;
+  document.querySelector("#export-csv-btn").onclick = null;
+  document.querySelector("#export-csv-btn").disabled = true;
+  document.querySelector("#results-modal-content").replaceChildren();
   modal.hidden = true;
   document.body.style.overflow = "";
 }
@@ -1316,18 +1431,17 @@ async function confirmDeleteSurvey() {
   deleteModalConfirm.textContent = "Eliminando...";
 
   try {
-    // Delete all responses in subcollection using batched writes
+    // Firestore batches are limited to 500 writes.
     const responsesSnapshot = await getDocs(collection(db, "surveys", surveyToDelete.id, "responses"));
-    const batch = writeBatch(db);
+    for (let offset = 0; offset < responsesSnapshot.docs.length; offset += 500) {
+      const batch = writeBatch(db);
+      responsesSnapshot.docs.slice(offset, offset + 500).forEach((responseDoc) => {
+        batch.delete(responseDoc.ref);
+      });
+      await batch.commit();
+    }
 
-    responsesSnapshot.docs.forEach((responseDoc) => {
-      batch.delete(responseDoc.ref);
-    });
-
-    // Delete the survey document
-    batch.delete(doc(db, "surveys", surveyToDelete.id));
-
-    await batch.commit();
+    await deleteDoc(doc(db, "surveys", surveyToDelete.id));
 
     closeDeleteModal();
     await loadSurveyResults();
@@ -1374,32 +1488,7 @@ async function loadSurveysTable() {
   showSkeleton(tbody, 5, "table");
   
   try {
-    const snapshot = await getDocs(collection(db, "surveys"));
-    allSurveys = await Promise.all(snapshot.docs.map(async (surveyDoc) => {
-      const data = surveyDoc.data();
-      const responsesSnapshot = await getDocs(collection(db, "surveys", surveyDoc.id, "responses"));
-      const counts = new Map((Array.isArray(data.options) ? data.options : []).map((option) => [option, 0]));
-      
-      responsesSnapshot.docs.forEach((responseDoc) => {
-        const answer = responseDoc.data().answer;
-        if (counts.has(answer)) {
-          counts.set(answer, counts.get(answer) + 1);
-        }
-      });
-      
-      return {
-        id: surveyDoc.id,
-        question: data.question ?? "Encuesta sin pregunta",
-        options: data.options ?? [],
-        active: data.active ?? true,
-        startAt: data.startAt,
-        endAt: data.endAt,
-        createdAt: data.createdAt,
-        createdBy: data.createdBy,
-        totalResponses: responsesSnapshot.size,
-        counts: [...counts.entries()],
-      };
-    }));
+    allSurveys = await loadSurveySummaries();
     
     applyFiltersAndSort();
     renderSurveysTable();
@@ -1566,6 +1655,7 @@ function escapeHtml(text) {
 
 // ===== SURVEY MODAL (Create/Edit) =====
 let editingSurveyId = null;
+let editingSurveyActive = true;
 
 function openSurveyModal(survey) {
   const modal = document.querySelector("#survey-modal");
@@ -1596,6 +1686,7 @@ function openSurveyModal(survey) {
   
   if (survey) {
     editingSurveyId = survey.id;
+    editingSurveyActive = survey.active ?? true;
     title.textContent = "Editar encuesta";
     hiddenId.value = survey.id;
     questionInput.value = survey.question;
@@ -1616,6 +1707,7 @@ function openSurveyModal(survey) {
     ).join("");
   } else {
     editingSurveyId = null;
+    editingSurveyActive = true;
     title.textContent = "Nueva encuesta";
     hiddenId.value = "";
   }
@@ -1708,13 +1800,18 @@ document.querySelector("#survey-modal-form").addEventListener("submit", async (e
 const surveyData = {
     question,
     options,
-    active: false,
+    active: editingSurveyActive,
     createdBy: ADMIN_EMAIL,
     updatedAt: serverTimestamp(),
   };
   
-  if (targetCountry) surveyData.targetCountry = targetCountry;
-  if (targetProvince) surveyData.targetProvince = targetProvince;
+  if (editingSurveyId) {
+    surveyData.targetCountry = targetCountry || deleteField();
+    surveyData.targetProvince = targetProvince || deleteField();
+  } else {
+    if (targetCountry) surveyData.targetCountry = targetCountry;
+    if (targetProvince) surveyData.targetProvince = targetProvince;
+  }
 
   if (!editingSurveyId) {
     surveyData.createdAt = serverTimestamp();

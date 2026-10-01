@@ -1,0 +1,8 @@
+{
+  "name": "estoy-bien-admin",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "npx --yes serve@14.2.5 . --listen 3000"
+  }
+}

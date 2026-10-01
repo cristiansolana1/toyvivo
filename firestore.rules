@@ -11,23 +11,137 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn()
-        && request.auth.token.email == 'cristiansolana1@gmail.com';
+        && request.auth.token.email == 'cristiansolana1@gmail.com'
+        && request.auth.token.email_verified == true;
     }
 
     match /users/{userId} {
-      allow get, list: if isSignedIn();
+      allow get, list: if isOwner(userId) || isAdmin();
       allow create, update, delete: if isOwner(userId);
-      // Permitir consultas por DNI (publicProfile.dni y profile.dni)
-      allow list: if isSignedIn();
 
       match /heartbeats/{heartbeatId} {
-        allow get, list: if isSignedIn();
+        allow get, list: if isOwner(userId) || isAdmin();
         allow create, update, delete: if isOwner(userId);
       }
 
       match /private/{docId} {
         allow read, write: if isOwner(userId);
       }
+
+      match /contactRequests/{requesterId} {
+        allow get: if isOwner(userId)
+          || (isSignedIn() && request.auth.uid == requesterId);
+        allow list: if isOwner(userId);
+        allow create: if isSignedIn()
+          && request.auth.uid == requesterId
+          && request.resource.data.keys().hasOnly(['requesterUid', 'requesterName', 'dni', 'status', 'createdAt'])
+          && request.resource.data.requesterUid == request.auth.uid
+          && request.resource.data.requesterName is string
+          && request.resource.data.dni is string
+          && request.resource.data.dni.matches('^[0-9]{7,8}$')
+          && request.resource.data.status == 'pending'
+          && request.resource.data.createdAt == request.time
+          && get(/databases/$(database)/documents/dniLookups/$(request.resource.data.dni)).data.uid == userId;
+        allow update: if (isOwner(userId)
+            && resource.data.status == 'pending'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt'])
+            && request.resource.data.status in ['approved', 'rejected']
+            && request.resource.data.respondedAt == request.time
+            && (request.resource.data.status == 'rejected'
+              || (existsAfter(/databases/$(database)/documents/users/$(userId)/trustedContacts/$(requesterId))
+                && existsAfter(/databases/$(database)/documents/users/$(requesterId)/watching/$(userId)))))
+          || (isSignedIn()
+            && request.auth.uid == requesterId
+            && resource.data.status == 'approved'
+            && !exists(/databases/$(database)/documents/users/$(userId)/trustedContacts/$(requesterId))
+            && !exists(/databases/$(database)/documents/users/$(requesterId)/watching/$(userId))
+            && request.resource.data.keys().hasOnly(['requesterUid', 'requesterName', 'dni', 'status', 'createdAt'])
+            && request.resource.data.requesterUid == request.auth.uid
+            && request.resource.data.requesterName is string
+            && request.resource.data.dni.matches('^[0-9]{7,8}$')
+            && get(/databases/$(database)/documents/dniLookups/$(request.resource.data.dni)).data.uid == userId
+            && request.resource.data.status == 'pending'
+            && request.resource.data.createdAt == request.time);
+        allow delete: if false;
+      }
+
+      match /trustedContacts/{contactId} {
+        allow read: if isOwner(userId);
+        allow create: if isSignedIn()
+          && request.auth.uid == userId
+          && request.resource.data.keys().hasOnly(['uid', 'displayName', 'approvedAt'])
+          && request.resource.data.uid == contactId
+          && request.resource.data.displayName is string
+          && request.resource.data.approvedAt == request.time
+          && get(/databases/$(database)/documents/users/$(userId)/contactRequests/$(contactId)).data.status == 'pending'
+          && getAfter(/databases/$(database)/documents/users/$(userId)/contactRequests/$(contactId)).data.status == 'approved'
+          && existsAfter(/databases/$(database)/documents/users/$(contactId)/watching/$(userId));
+        allow delete: if (isOwner(userId)
+            && existsAfter(/databases/$(database)/documents/users/$(contactId)/watching/$(userId)) == false)
+          || (isSignedIn()
+            && request.auth.uid == contactId
+            && existsAfter(/databases/$(database)/documents/users/$(contactId)/watching/$(userId)) == false);
+        allow update: if false;
+      }
+
+      match /watching/{targetId} {
+        allow read: if isOwner(userId);
+        allow create: if isSignedIn()
+          && request.resource.data.keys().hasOnly(['uid', 'approvedAt'])
+          && request.resource.data.uid == targetId
+          && request.resource.data.approvedAt == request.time
+          && ((request.auth.uid == targetId
+              && get(/databases/$(database)/documents/users/$(targetId)/contactRequests/$(userId)).data.status == 'pending'
+              && getAfter(/databases/$(database)/documents/users/$(targetId)/contactRequests/$(userId)).data.status == 'approved'
+              && existsAfter(/databases/$(database)/documents/users/$(targetId)/trustedContacts/$(userId)))
+            || (request.auth.uid == userId
+              && exists(/databases/$(database)/documents/users/$(targetId)/trustedContacts/$(userId))));
+        allow delete: if isSignedIn()
+          && (request.auth.uid == userId || request.auth.uid == targetId)
+          && existsAfter(/databases/$(database)/documents/users/$(targetId)/trustedContacts/$(userId)) == false;
+        allow update: if false;
+      }
+    }
+
+    match /dniLookups/{dni} {
+      allow get: if isSignedIn() && dni.matches('^[0-9]{7,8}$');
+      allow list: if false;
+      allow create: if isSignedIn()
+        && dni.matches('^[0-9]{7,8}$')
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && existsAfter(/databases/$(database)/documents/users/$(request.auth.uid)/private/profile)
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)/private/profile).data.dni == dni;
+      allow update: if isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && existsAfter(/databases/$(database)/documents/users/$(request.auth.uid)/private/profile)
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)/private/profile).data.dni == dni;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    match /userStatus/{userId} {
+      allow get: if isOwner(userId)
+        || isAdmin()
+        || (isSignedIn()
+          && exists(/databases/$(database)/documents/users/$(userId)/trustedContacts/$(request.auth.uid)));
+      allow list: if false;
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(['fullName', 'phone', 'lastAliveAt'])
+        && request.resource.data.fullName is string
+        && request.resource.data.phone is string
+        && (!('lastAliveAt' in request.resource.data)
+          || request.resource.data.lastAliveAt == request.time);
+      allow update: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(['fullName', 'phone', 'lastAliveAt'])
+        && request.resource.data.fullName is string
+        && request.resource.data.phone is string
+        && (!('lastAliveAt' in request.resource.data)
+          || !('lastAliveAt' in resource.data)
+          || request.resource.data.lastAliveAt == resource.data.lastAliveAt
+          || request.resource.data.lastAliveAt == request.time);
+      allow delete: if isOwner(userId);
     }
 
     match /surveys/{surveyId} {
@@ -38,7 +152,7 @@ service cloud.firestore {
         allow read: if isSignedIn()
           && (request.auth.uid == userId || isAdmin());
         allow create: if isOwner(userId);
-        allow update, delete: if isOwner(userId) || isAdmin();
+        allow update, delete: if isAdmin();
       }
     }
   }

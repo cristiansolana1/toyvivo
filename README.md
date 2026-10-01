@@ -5,7 +5,7 @@ Aplicación móvil (React Native + Expo) y panel de administración web para com
 ## Stack Tecnológico
 
 - **Mobile**: React Native 0.86, Expo 57, TypeScript, React Navigation 7
-- **Backend**: Firebase Auth, Firestore, AsyncStorage (offline-first)
+- **Backend**: Firebase Auth, Firestore y SecureStore/AsyncStorage
 - **Admin Panel**: Vanilla JS + Firebase SDK (ES Modules)
 - **Hosting**: Firebase Hosting (admin), EAS/Expo (mobile)
 
@@ -40,10 +40,10 @@ App/
 ## Funcionalidades
 
 ### App Móvil
-- **Autenticación**: Email/password con persistencia web (`browserLocalPersistence`)
-- **Perfil de usuario**: Nombre, DNI, teléfono (guardado local + Firestore)
+- **Autenticación**: Email/password con persistencia web y nativa
+- **Perfil de usuario**: nombre, DNI, teléfono y nacimiento en documento privado; SecureStore en dispositivos nativos
 - **Avisos de vida (Heartbeats)**: Botón "Estoy bien" con cooldown 24h, guardado offline-first + sync nube
-- **Seguimiento contactos**: Agregar usuarios por DNI/UID, ver último aviso en tiempo real, llamar
+- **Seguimiento contactos**: alta por DNI, aprobación explícita, estado compartido en tiempo real y revocación
 - **Encuestas**: Responder encuestas activas (una vez por usuario)
 - **Compartir app**: Native share dialog
 - **Soporte**: Enlace mailto predefinido
@@ -60,13 +60,16 @@ App/
 ### `users/{uid}`
 ```typescript
 {
-  publicProfile: { fullName, dni, phone },
-  emailNormalized: string,
+  publicProfile: { fullName, country, province },
+  emailNormalized: string, // acceso de administrador únicamente
   lastAliveAt: Timestamp,
-  watchingUserIds: string[],  // UIDs o "dni:12345678"
   profileUpdatedAt: Timestamp
 }
 ```
+
+Los datos personales completos viven en `users/{uid}/private/profile` y solo el titular puede leerlos. `dniLookups/{dni}` contiene únicamente el UID y permite una consulta puntual por DNI; no se puede listar. Esa consulta puede revelar si un DNI corresponde a una cuenta y el UID asociado. `users/{uid}/contactRequests` recibe solicitudes, pero nombre, teléfono y estado solo se comparten después de la aprobación; las relaciones viven en `trustedContacts` y `watching`. `userStatus/{uid}` solo es legible por el titular, el administrador verificado y contactos aprobados. No se necesita Cloud Functions ni plan Blaze.
+
+Los perfiles existentes publican su índice DNI al guardar o migrar el perfil local. Los contactos antiguos conservan su lista, pero el acceso al estado requiere que el dueño apruebe una solicitud nueva.
 
 ### `users/{uid}/heartbeats/{id}`
 ```typescript
@@ -93,7 +96,8 @@ App/
 
 ## Requisitos Previos
 
-- Node.js 18+
+- Node.js 20 o superior para las herramientas locales
+- JDK 21 o superior para ejecutar el emulador Firestore y las pruebas de reglas
 - Cuenta Firebase (proyecto `toyvivo-213f7`)
 - Expo CLI: `npm install -g expo-cli`
 - Firebase CLI: `npm install -g firebase-tools`
@@ -132,10 +136,15 @@ firebase login
 firebase use toyvivo-213f7
 ```
 
-### 4. Desplegar reglas e índices Firestore
+### 4. Probar permisos y desplegar reglas
 ```bash
+npm run test:rules
 firebase deploy --only firestore:rules,firestore:indexes
 ```
+
+El test de reglas usa un proyecto `demo-*` local y no accede al proyecto de producción. El flujo de contactos funciona directamente con Firestore; no requiere Cloud Functions ni activar facturación Blaze.
+
+La cuenta `cristiansolana1@gmail.com` debe existir en Firebase Authentication y tener el correo verificado para acceder al panel.
 
 ### 5. Panel Admin - Config local
 Crear `admin/firebase-config.js` (no se commitea):
@@ -163,6 +172,8 @@ cd admin && npx serve .
 ---
 
 ## Despliegue: App Móvil (EAS Build)
+
+Después de instalar `expo-secure-store`, genera un nuevo build nativo para Android/iOS; una actualización OTA no incorpora módulos nativos.
 
 ### Configuración inicial (una sola vez)
 ```bash
@@ -307,7 +318,7 @@ firebase deploy --only firestore:rules,firestore:indexes
 
 | Error | Solución |
 |-------|----------|
-| `permission-denied` al agregar DNI | Verifica índices single-field en Firebase Console > Firestore > Índices (`publicProfile.dni`, `profile.dni`) |
+| `permission-denied` al agregar DNI | Confirma que estén desplegadas las reglas actuales y que ambos usuarios hayan guardado/migrado sus perfiles |
 | Login web no navega | Limpia cache navegador / verifica `browserLocalPersistence` en `src/firebase.ts` |
 | Admin panel "API key not valid" | Agrega `localhost:3000` (o tu dominio) en restricciones de API Key |
 | Build EAS falla | `eas build --clear-cache` |

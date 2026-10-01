@@ -1,70 +1,138 @@
-import { doc, getDoc, setDoc, query, collection, where, getDocs, onSnapshot } from "firebase/firestore";
-import { db } from "../firebase";
+import {
+  collection,
+  deleteField,
+  doc,
+  getDoc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+  writeBatch,
+} from "firebase/firestore";
+import { auth, db } from "../firebase";
 import { UserProfile } from "../types";
 import { saveUserProfile as saveLocalProfile, loadUserProfile as loadLocalProfile } from "../storage";
 
-export async function saveUserProfile(uid: string, profile: UserProfile): Promise<void> {
+export async function saveUserProfile(
+  uid: string,
+  profile: UserProfile,
+  email?: string | null
+): Promise<void> {
+  const previousProfile = await loadLocalProfile(uid);
   await saveLocalProfile(uid, profile);
-  await setDoc(
-    doc(db, "users", uid),
-    {
-      publicProfile: {
-        fullName: profile.fullName,
-        dni: profile.dni,
-        phone: profile.phone,
-        country: profile.country,
-        province: profile.province,
-        birthDate: profile.birthDate,
-      },
-      profileUpdatedAt: new Date().toISOString(),
+  const userRef = doc(db, "users", uid);
+  const batch = writeBatch(db);
+  batch.set(userRef, {
+    publicProfile: {
+      fullName: profile.fullName,
+      country: profile.country,
+      province: profile.province,
+      dni: deleteField(),
+      phone: deleteField(),
+      birthDate: deleteField(),
     },
-    { merge: true }
-  );
+    ...(email ? { emailNormalized: email.trim().toLowerCase() } : {}),
+    profileUpdatedAt: serverTimestamp(),
+  }, { merge: true });
+  batch.set(doc(db, "users", uid, "private", "profile"), profile);
+  if (previousProfile?.dni && previousProfile.dni !== profile.dni) {
+    batch.delete(doc(db, "dniLookups", previousProfile.dni));
+  }
+  batch.set(doc(db, "dniLookups", profile.dni), { uid });
+  batch.set(doc(db, "userStatus", uid), {
+    fullName: profile.fullName,
+    phone: profile.phone,
+  }, { merge: true });
+  await batch.commit();
 }
 
 export async function loadUserProfile(uid: string): Promise<UserProfile | null> {
   return loadLocalProfile(uid);
 }
 
-export async function getUserByDni(dni: string): Promise<{ uid: string; profile: UserProfile } | null> {
-  const [publicResult, legacyResult] = await Promise.all([
-    getDocs(query(collection(db, "users"), where("publicProfile.dni", "==", dni))),
-    getDocs(query(collection(db, "users"), where("profile.dni", "==", dni))),
-  ]);
-  const userDoc = [...publicResult.docs, ...legacyResult.docs][0];
-  if (!userDoc) return null;
+export async function requestContactByDni(
+  dni: string,
+  requesterUid: string
+): Promise<"pending" | "restored"> {
+  const normalizedDni = dni.replace(/\D/g, "");
+  if (!/^\d{7,8}$/.test(normalizedDni)) throw new Error("INVALID_DNI");
+  const lookup = await getDoc(doc(db, "dniLookups", normalizedDni));
+  if (!lookup.exists()) throw new Error("USER_NOT_FOUND");
 
-  const data = userDoc.data();
-  const profile = data.publicProfile ?? data.profile;
-  return { uid: userDoc.id, profile: profile as UserProfile };
+  const targetUid = String(lookup.data().uid ?? "");
+  if (!targetUid || targetUid === requesterUid) throw new Error("INVALID_TARGET");
+  const watchingRef = doc(db, "users", requesterUid, "watching", targetUid);
+  const trustedRef = doc(db, "users", targetUid, "trustedContacts", requesterUid);
+  const [persistentContact, trustedContact] = await Promise.all([getDoc(watchingRef), getDoc(trustedRef)]);
+  if (persistentContact.exists()) throw new Error("CONTACT_ALREADY_EXISTS");
+  if (trustedContact.exists()) {
+    await setDoc(watchingRef, { uid: targetUid, approvedAt: serverTimestamp() });
+    return "restored";
+  }
+
+  const profile = await loadLocalProfile(requesterUid);
+  const requestRef = doc(db, "users", targetUid, "contactRequests", requesterUid);
+  const existingRequest = await getDoc(requestRef);
+  if (existingRequest.exists()) {
+    const status = existingRequest.data().status;
+    if (status === "pending") throw new Error("REQUEST_ALREADY_EXISTS");
+    if (status === "rejected") throw new Error("REQUEST_REJECTED");
+  }
+  await setDoc(requestRef, {
+    requesterUid,
+    requesterName: profile?.fullName ?? "Usuario de Estoy Bien",
+    dni: normalizedDni,
+    status: "pending",
+    createdAt: serverTimestamp(),
+  });
+  return "pending";
 }
 
-export async function getUserById(uid: string): Promise<UserProfile | null> {
-  const userDoc = await getDoc(doc(db, "users", uid));
-  if (!userDoc.exists()) return null;
-  const data = userDoc.data();
-  return (data.publicProfile ?? data.profile) as UserProfile;
+export function subscribeToWatchingUserIds(
+  uid: string,
+  onUpdate: (ids: string[]) => void,
+  onError?: () => void
+): () => void {
+  return onSnapshot(collection(db, "users", uid, "watching"), (snapshot) => {
+    onUpdate(snapshot.docs.map((contact) => contact.id));
+  }, onError);
 }
 
-export async function addWatchingUser(uid: string, targetUserId: string): Promise<void> {
-  const userDoc = await getDoc(doc(db, "users", uid));
-  const currentIds = (userDoc.data()?.watchingUserIds as string[]) ?? [];
-  if (currentIds.includes(targetUserId)) return;
+export async function respondToContactRequest(requesterUid: string, approved: boolean): Promise<void> {
+  const currentUid = auth.currentUser?.uid;
+  if (!currentUid) throw new Error("UNAUTHENTICATED");
+  const ownerProfile = await getDoc(doc(db, "users", currentUid, "private", "profile"));
+  if (approved && !ownerProfile.data()?.phone) throw new Error("PROFILE_PHONE_MISSING");
 
-  const updatedIds = [...currentIds, targetUserId];
-  await setDoc(doc(db, "users", uid), { watchingUserIds: updatedIds }, { merge: true });
+  const requestRef = doc(db, "users", currentUid, "contactRequests", requesterUid);
+  const requestSnapshot = await getDoc(requestRef);
+  if (!requestSnapshot.exists() || requestSnapshot.data().status !== "pending") {
+    throw new Error("REQUEST_NOT_PENDING");
+  }
+
+  const batch = writeBatch(db);
+  batch.update(requestRef, {
+    status: approved ? "approved" : "rejected",
+    respondedAt: serverTimestamp(),
+  });
+  if (approved) {
+    batch.set(doc(db, "users", currentUid, "trustedContacts", requesterUid), {
+      uid: requesterUid,
+      displayName: requestSnapshot.data().requesterName ?? "Usuario de Estoy Bien",
+      approvedAt: serverTimestamp(),
+    });
+    batch.set(doc(db, "users", requesterUid, "watching", currentUid), {
+      uid: currentUid,
+      approvedAt: serverTimestamp(),
+    });
+  }
+  await batch.commit();
 }
 
 export async function removeWatchingUser(uid: string, targetUserId: string): Promise<void> {
-  const userDoc = await getDoc(doc(db, "users", uid));
-  const currentIds = (userDoc.data()?.watchingUserIds as string[]) ?? [];
-  const updatedIds = currentIds.filter((id) => id !== targetUserId);
-  await setDoc(doc(db, "users", uid), { watchingUserIds: updatedIds }, { merge: true });
-}
-
-export async function getWatchingUserIds(uid: string): Promise<string[]> {
-  const userDoc = await getDoc(doc(db, "users", uid));
-  return (userDoc.data()?.watchingUserIds as string[]) ?? [];
+  const batch = writeBatch(db);
+  batch.delete(doc(db, "users", uid, "watching", targetUserId));
+  batch.delete(doc(db, "users", targetUserId, "trustedContacts", uid));
+  await batch.commit();
 }
 
 export type WatchedUserStatus = {
@@ -74,74 +142,24 @@ export type WatchedUserStatus = {
   lastAliveAt: string | null;
 };
 
-export async function getWatchedUsersStatus(userIds: string[]): Promise<WatchedUserStatus[]> {
-  if (userIds.length === 0) return [];
-
-  const dniIds = userIds.filter((id) => id.startsWith("dni:"));
-  const registeredIds = userIds.filter((id) => !id.startsWith("dni:"));
-
-  const dniUsers = await Promise.all(
-    dniIds.map(async (id) => {
-      const dni = id.slice("dni:".length);
-      const result = await getUserByDni(dni);
-      if (!result) {
-        return { uid: id, fullName: "Usuario sin Cuenta", phone: "", lastAliveAt: null } as WatchedUserStatus;
-      }
-      return {
-        uid: id,
-        fullName: result.profile.fullName,
-        phone: result.profile.phone,
-        lastAliveAt: null,
-      } as WatchedUserStatus;
-    })
-  );
-
-  // Batch read for registered users - get all docs in parallel (optimized from N individual calls)
-  let registeredUsers: WatchedUserStatus[] = [];
-  if (registeredIds.length > 0) {
-    const userDocs = await Promise.all(
-      registeredIds.map((uid) => getDoc(doc(db, "users", uid)))
-    );
-    const userData = userDocs.map((doc) => doc.data());
-    const newUsers = await Promise.all(
-      registeredIds.map((uid, index) => {
-        const data = userData[index];
-        if (!data) return null;
-        const profile = (data.publicProfile ?? data.profile) as UserProfile | undefined;
-        if (!profile) return null;
-        return {
-          uid,
-          fullName: profile.fullName,
-          phone: profile.phone,
-          lastAliveAt: data.lastAliveAt?.toDate?.()?.toISOString?.() ?? null,
-        } as WatchedUserStatus;
-      })
-    );
-    registeredUsers = newUsers.filter((u): u is WatchedUserStatus => u !== null);
-  }
-
-  return [...dniUsers, ...registeredUsers];
-}
-
 export function subscribeToWatchedUsers(
   userIds: string[],
-  onUpdate: (user: WatchedUserStatus) => void
+  onUpdate: (user: WatchedUserStatus) => void,
+  onError?: () => void
 ): () => void {
-  const registeredIds = userIds.filter((id) => !id.startsWith("dni:"));
-  if (registeredIds.length === 0) return () => {};
+  if (userIds.length === 0) return () => {};
 
-  const unsubscribers = registeredIds.map((watchedUserId) =>
-    onSnapshot(doc(db, "users", watchedUserId), (snapshot) => {
+  const unsubscribers = userIds.map((watchedUserId) =>
+    onSnapshot(doc(db, "userStatus", watchedUserId), (snapshot) => {
       if (!snapshot.exists()) return;
       const data = snapshot.data();
-      const profile = data.publicProfile ?? data.profile;
       onUpdate({
         uid: watchedUserId,
-        fullName: profile?.fullName ?? "Usuario sin Cuenta",
-        phone: profile?.phone ?? "",
-        lastAliveAt: data?.lastAliveAt?.toDate?.()?.toISOString?.() ?? null,
+        fullName: data.fullName ?? "Usuario",
+        phone: data.phone ?? "",
+        lastAliveAt: data.lastAliveAt?.toDate?.()?.toISOString?.() ?? null,
       });
-    })
+    }, onError)
   );
 
   return () => unsubscribers.forEach((unsub) => unsub());

@@ -5,6 +5,7 @@ import { Alert, Linking, RefreshControl, Pressable, ScrollView, Share, StyleShee
 import { SkeletonLoader } from "../components/SkeletonLoader";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 import { useWatchedUsers } from "../hooks/useWatchedUsers";
+import { useContactRequests } from "../hooks/useContactRequests";
 import { useSurvey } from "../hooks/useSurvey";
 import { useProfile } from "../hooks/useProfile";
 import { HeartbeatButton } from "../components/HeartbeatButton";
@@ -13,7 +14,6 @@ import { ProfileEditor } from "../components/ProfileEditor";
 import { SurveyCard } from "../components/SurveyCard";
 import { AddUserForm } from "../components/AddUserForm";
 import { isHeartbeatOverdue, formatHeartbeatCountdown, FIXED_COUNTRY_LABEL, PROVINCES_AR } from "../constants";
-import { getWatchedUsersStatus, getWatchingUserIds } from "../services/userService";
 import { User } from "firebase/auth";
 import { UserProfile } from "../types";
 
@@ -60,6 +60,13 @@ export function HomeScreen({
     removeWatchedUser,
     setWatchMessage,
   } = useWatchedUsers(user.uid);
+
+  const {
+    requests: contactRequests,
+    error: contactRequestError,
+    respondingUid,
+    respond: respondToRequest,
+  } = useContactRequests(user.uid);
 
   const {
     survey,
@@ -197,6 +204,41 @@ export function HomeScreen({
         </View>
       )}
 
+      {contactRequests.length > 0 ? (
+        <View style={styles.requestCard}>
+          <Text style={styles.requestTitle}>Solicitudes de contacto</Text>
+          <Text style={styles.requestDisclosure}>
+            Al aceptar, compartirás tu nombre, teléfono y último aviso con esa persona. Puedes revocar el acceso quitándola de Seguridad de tus contactos.
+          </Text>
+          {contactRequestError ? <Text style={styles.requestError}>{contactRequestError}</Text> : null}
+          {contactRequests.map((request) => (
+            <View key={request.requesterUid} style={styles.requestRow}>
+              <Text style={styles.requestName}>{request.requesterName}</Text>
+              <View style={styles.requestActions}>
+                <Pressable
+                  style={[styles.requestButton, styles.rejectButton]}
+                  onPress={() => void respondToRequest(request.requesterUid, false)}
+                  disabled={respondingUid === request.requesterUid}
+                  accessibilityLabel={`Rechazar solicitud de ${request.requesterName}`}
+                >
+                  <Text style={styles.rejectButtonText}>Rechazar</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.requestButton, styles.approveButton]}
+                  onPress={() => void respondToRequest(request.requesterUid, true)}
+                  disabled={respondingUid === request.requesterUid}
+                  accessibilityLabel={`Aprobar solicitud de ${request.requesterName}`}
+                >
+                  <Text style={styles.approveButtonText}>Aceptar</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : contactRequestError ? (
+        <Text style={styles.requestError}>{contactRequestError}</Text>
+      ) : null}
+
       {showProfileEditor && currentProfile?.fullName ? (
         <ProfileEditor
           profile={currentProfile}
@@ -245,7 +287,7 @@ export function HomeScreen({
       {sortedWatchedUsers.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateTitle}>Todavía no agregaste contactos</Text>
-          <Text style={styles.emptyStateText}>Agrega el DNI de una persona para recibir su estado y avisarte si hay una alerta.</Text>
+          <Text style={styles.emptyStateText}>Agrega el DNI de una persona. Recibirá una solicitud y deberá aprobarla antes de compartir su estado y teléfono.</Text>
         </View>
       ) : (
         sortedWatchedUsers.map((watchedUser) => (
@@ -429,5 +471,68 @@ const styles = StyleSheet.create({
   errorBannerText: {
     color: "#842029",
     fontWeight: "500",
+  },
+  requestCard: {
+    backgroundColor: "#fffdf8",
+    borderWidth: 1,
+    borderColor: "#d5dfd8",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 18,
+  },
+  requestTitle: {
+    color: "#15231f",
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  requestDisclosure: {
+    color: "#587068",
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  requestRow: {
+    borderTopWidth: 1,
+    borderTopColor: "#e1e8e3",
+    paddingTop: 12,
+    marginTop: 8,
+  },
+  requestName: {
+    color: "#15231f",
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 10,
+  },
+  requestActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  requestButton: {
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  rejectButton: {
+    backgroundColor: "#f1f5f2",
+    borderWidth: 1,
+    borderColor: "#cbd8cf",
+  },
+  rejectButtonText: {
+    color: "#38564b",
+    fontWeight: "600",
+  },
+  approveButton: {
+    backgroundColor: "#286052",
+  },
+  approveButtonText: {
+    color: "#fffdf8",
+    fontWeight: "700",
+  },
+  requestError: {
+    color: "#b91c1c",
+    fontSize: 13,
+    marginBottom: 8,
   },
 });

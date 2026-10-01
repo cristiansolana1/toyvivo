@@ -1,4 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 import { HeartbeatEntry, UserProfile } from "./types";
 
 const profileKey = (uid: string) => `profile:${uid}`;
@@ -7,11 +9,32 @@ const lastHeartbeatKey = (uid: string) => `lastHeartbeat:${uid}`;
 const pendingHeartbeatsKey = (uid: string) => `pendingHeartbeats:${uid}`;
 
 export async function saveUserProfile(uid: string, profile: UserProfile) {
-  await AsyncStorage.setItem(profileKey(uid), JSON.stringify(profile));
+  const key = profileKey(uid);
+  const serializedProfile = JSON.stringify(profile);
+  if (Platform.OS === "web") {
+    await AsyncStorage.setItem(key, serializedProfile);
+    return;
+  }
+
+  await SecureStore.setItemAsync(key, serializedProfile);
+  await AsyncStorage.removeItem(key);
 }
 
 export async function loadUserProfile(uid: string): Promise<UserProfile | null> {
-  const rawProfile = await AsyncStorage.getItem(profileKey(uid));
+  const key = profileKey(uid);
+  let rawProfile: string | null;
+  if (Platform.OS === "web") {
+    rawProfile = await AsyncStorage.getItem(key);
+  } else {
+    rawProfile = await SecureStore.getItemAsync(key);
+    if (!rawProfile) {
+      rawProfile = await AsyncStorage.getItem(key);
+      if (rawProfile) {
+        await SecureStore.setItemAsync(key, rawProfile);
+        await AsyncStorage.removeItem(key);
+      }
+    }
+  }
   if (!rawProfile) {
     return null;
   }

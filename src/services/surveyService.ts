@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, getDoc, runTransaction, setDoc } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, query, runTransaction, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { Survey } from "../types";
 
@@ -31,7 +31,7 @@ function surveyMatchesLocation(survey: SurveyWithMeta, userCountry?: string, use
 }
 
 export async function getActiveSurveys(userCountry?: string, userProvince?: string): Promise<SurveyWithMeta[]> {
-  const snapshot = await getDocs(collection(db, "surveys"));
+  const snapshot = await getDocs(query(collection(db, "surveys"), where("active", "==", true)));
   const now = Date.now();
   return snapshot.docs
     .map((surveyDoc) => {
@@ -64,19 +64,20 @@ export async function getActiveSurveys(userCountry?: string, userProvince?: stri
 
 export async function getUnansweredSurvey(userId: string, userCountry?: string, userProvince?: string): Promise<Survey | null> {
   const activeSurveys = await getActiveSurveys(userCountry, userProvince);
-  for (const candidate of activeSurveys) {
-    const response = await getDoc(doc(db, "surveys", candidate.id, "responses", userId));
-    if (!response.exists()) {
-      return {
-        id: candidate.id,
-        question: candidate.question ?? "",
-        options: (candidate.options as unknown[])
-          .filter((option): option is string => typeof option === "string")
-          .slice(0, 4),
-      };
-    }
-  }
-  return null;
+  const responses = await Promise.all(
+    activeSurveys.map((candidate) => getDoc(doc(db, "surveys", candidate.id, "responses", userId)))
+  );
+  const unansweredIndex = responses.findIndex((response) => !response.exists());
+  if (unansweredIndex < 0) return null;
+
+  const candidate = activeSurveys[unansweredIndex];
+  return {
+    id: candidate.id,
+    question: candidate.question ?? "",
+    options: (candidate.options as unknown[])
+      .filter((option): option is string => typeof option === "string")
+      .slice(0, 4),
+  };
 }
 
 export async function submitSurveyResponse(

@@ -18,10 +18,10 @@ export function AddUserForm({ value, onChangeText, onSubmit, disabled, message }
           placeholder="DNI del usuario"
           placeholderTextColor="#64748b"
           value={value}
-          onChangeText={(text) => onChangeText(text.replace(/[^0-9]/g, ""))}
-          accessibilityLabel="DNI del usuario a seguir"
+          onChangeText={(text) => onChangeText(text.replace(/\D/g, ""))}
+          accessibilityLabel="DNI del usuario a agregar"
         />
-        <Pressable style={[styles.primaryButton, styles.submitButton]} onPress={onSubmit} disabled={disabled} accessibilityLabel="Agregar usuario">
+        <Pressable style={[styles.primaryButton, styles.submitButton]} onPress={onSubmit} disabled={disabled} accessibilityLabel="Agregar usuario por DNI">
           <Text style={styles.primaryButtonText}>{disabled ? "Agregando..." : "Agregar"}</Text>
         </Pressable>
       </View>
