@@ -8,6 +8,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   collection,
+  deleteField,
   deleteDoc,
   doc,
   getDoc,
@@ -99,6 +100,20 @@ test("contact request records are readable by the owner and addressed requester 
   await assertFails(setDoc(doc(bob, "users/bob/watching/alice"), { uid: "alice" }));
 });
 
+test("a contact can read only its own trusted-contact grant", async () => {
+  await seedFirestore(async (db) => {
+    await setDoc(doc(db, "users/alice/trustedContacts/bob"), { uid: "bob" });
+    await setDoc(doc(db, "users/alice/trustedContacts/carol"), { uid: "carol" });
+  });
+
+  const alice = testEnvironment.authenticatedContext("alice").firestore();
+  const bob = testEnvironment.authenticatedContext("bob").firestore();
+  await assertSucceeds(getDoc(doc(bob, "users/alice/trustedContacts/bob")));
+  await assertFails(getDoc(doc(bob, "users/alice/trustedContacts/carol")));
+  await assertFails(getDocs(collection(bob, "users/alice/trustedContacts")));
+  await assertSucceeds(getDocs(collection(alice, "users/alice/trustedContacts")));
+});
+
 test("an exact DNI lookup returns only a UID and cannot be enumerated", async () => {
   await seedFirestore(async (db) => {
     await setDoc(doc(db, "dniLookups/12345678"), { uid: "alice" });
@@ -131,6 +146,39 @@ test("DNI lookup records must match the owner's private profile and cannot be cl
   claimExistingIndex.set(doc(bob, "dniLookups/12345678"), { uid: "bob" });
   await assertFails(claimExistingIndex.commit());
   assert.equal((await getDoc(doc(alice, "dniLookups/12345678"))).data().uid, "alice");
+});
+
+test("a complete profile save batch succeeds for its owner", async () => {
+  const alice = testEnvironment.authenticatedContext("alice").firestore();
+  const profile = {
+    fullName: "Alice Example",
+    dni: "12345678",
+    phone: "+541100000000",
+    country: "AR",
+    province: "BA",
+    birthDate: "1990-01-01",
+  };
+  const batch = writeBatch(alice);
+  batch.set(doc(alice, "users/alice"), {
+    publicProfile: {
+      fullName: profile.fullName,
+      country: profile.country,
+      province: profile.province,
+      dni: deleteField(),
+      phone: deleteField(),
+      birthDate: deleteField(),
+    },
+    emailNormalized: "alice@example.com",
+    profileUpdatedAt: serverTimestamp(),
+  }, { merge: true });
+  batch.set(doc(alice, "users/alice/private/profile"), profile);
+  batch.set(doc(alice, "dniLookups/12345678"), { uid: "alice" });
+  batch.set(doc(alice, "userStatus/alice"), {
+    fullName: profile.fullName,
+    phone: profile.phone,
+  }, { merge: true });
+
+  await assertSucceeds(batch.commit());
 });
 
 test("a DNI request must resolve to its target UID", async () => {

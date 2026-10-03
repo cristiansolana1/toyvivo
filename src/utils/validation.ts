@@ -3,8 +3,12 @@ export interface ValidationResult {
   error?: string;
 }
 
+export function normalizeDNI(value: string): string {
+  return value.replace(/[^0-9]/g, "");
+}
+
 export function validateDNI(value: string): ValidationResult {
-  const cleaned = value.replace(/[^0-9]/g, "");
+  const cleaned = normalizeDNI(value);
   
   if (cleaned.length < 7 || cleaned.length > 8) {
     return { isValid: false, error: "DNI debe tener 7 u 8 dígitos" };

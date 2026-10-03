@@ -5,7 +5,7 @@ import { Picker } from "@react-native-picker/picker";
 import { UserProfile } from "../types";
 import { PROVINCES_AR, FIXED_COUNTRY, FIXED_COUNTRY_LABEL } from "../constants";
 import { toDDMMYYYY, formatBirthDateInput, toISODate } from "../utils/date";
-import { validateProfile, getFirstValidationError } from "../utils/validation";
+import { validateProfile, getFirstValidationError, normalizeDNI } from "../utils/validation";
 
 interface ProfileEditorProps {
   profile: UserProfile;
@@ -27,7 +27,7 @@ export function ProfileEditor({ profile, onSave, onCancel, saving }: ProfileEdit
   const handleSave = async () => {
     const updatedProfile: UserProfile = {
       fullName: fullName.trim(),
-      dni: dni.trim(),
+      dni: normalizeDNI(dni),
       phone: phone.trim(),
       country: FIXED_COUNTRY,
       province,

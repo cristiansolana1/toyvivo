@@ -107,6 +107,7 @@ textarea:focus { border-color: #286052; box-shadow: 0 0 0 3px #28605220; }
 
 /* ===== SIDEBAR & LAYOUT ===== */
 .dashboard-view { display: grid; grid-template-columns: 260px 1fr; gap: 0; padding-top: 0; min-height: calc(100vh - 88px); }
+.login-view[hidden], .dashboard-view[hidden], .view-content[hidden] { display: none !important; }
 
 .sidebar { background: #fffdf8; border-right: 1px solid #d5dfd8; padding: 24px 0; height: calc(100vh - 88px); position: sticky; top: 0; overflow-y: auto; }
 

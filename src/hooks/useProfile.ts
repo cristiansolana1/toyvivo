@@ -1,67 +1,70 @@
 import { useState, useEffect, useCallback } from "react";
 import { UserProfile } from "../types";
-import { saveUserProfile, loadUserProfile } from "../services/userService";
+import { hydrateUserProfile, saveUserProfile } from "../services/profileService";
 
 interface UseProfileReturn {
   profile: UserProfile | null;
   loading: boolean;
   saving: boolean;
-  saveProfile: (profile: UserProfile) => Promise<boolean>;
-  setProfile: (profile: UserProfile | null) => void;
+  error: string | null;
+  saveProfile: (profile: UserProfile) => Promise<void>;
 }
 
-export function useProfile(userId: string, initialProfile?: UserProfile): UseProfileReturn {
-  const [profile, setProfileState] = useState<UserProfile | null>(initialProfile ?? null);
+export function useProfile(userId: string | null, email?: string | null): UseProfileReturn {
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let mounted = true;
-
-    async function load() {
-      try {
-        const local = await loadUserProfile(userId);
-        if (mounted && local) {
-          // Solo usar localStorage si no tenemos initialProfile o si difiere
-          if (!initialProfile || JSON.stringify(local) !== JSON.stringify(initialProfile)) {
-            setProfileState(local);
-          }
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
+    let active = true;
+    if (!userId) {
+      setProfile(null);
+      setLoading(false);
+      setError(null);
+      return;
     }
 
-    load();
+    setProfile(null);
+    setLoading(true);
+    setError(null);
+    void hydrateUserProfile(userId, email)
+      .then((loadedProfile) => {
+        if (active) setProfile(loadedProfile);
+      })
+      .catch((loadError) => {
+        if (!active) return;
+        console.error("Failed to load user profile:", loadError);
+        setProfile(null);
+        setError("No se pudo cargar tu perfil. Revisa tu conexión e inténtalo de nuevo.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
-    return () => { mounted = false; };
-  }, [userId, initialProfile]);
+    return () => { active = false; };
+  }, [userId, email]);
 
   const saveProfile = useCallback(
-    async (newProfile: UserProfile): Promise<boolean> => {
+    async (newProfile: UserProfile): Promise<void> => {
+      if (!userId) throw new Error("UNAUTHENTICATED");
       try {
         setSaving(true);
-        await saveUserProfile(userId, newProfile);
-        setProfileState(newProfile);
-        return true;
-      } catch {
-        return false;
+        setError(null);
+        await saveUserProfile(userId, newProfile, email);
+        setProfile(newProfile);
       } finally {
         setSaving(false);
       }
     },
-    [userId]
+    [email, userId]
   );
-
-  const setProfile = useCallback((newProfile: UserProfile | null) => {
-    setProfileState(newProfile);
-  }, []);
 
   return {
     profile,
     loading,
     saving,
+    error,
     saveProfile,
-    setProfile,
   };
 }

@@ -74,7 +74,7 @@ export function useWatchedUsers(userId: string): UseWatchedUsersReturn {
                 : error instanceof Error && error.message === "REQUEST_REJECTED"
                   ? "La solicitud anterior fue rechazada. Pídele a esa persona que vuelva a aprobar el contacto."
                 : firebaseCode === "permission-denied"
-                  ? "Firestore no permitió crear la solicitud. Revisa las reglas publicadas."
+                  ? "Firestore no permitió consultar o crear la solicitud. Revisa las reglas publicadas."
                   : `No se pudo agregar al usuario (${firebaseCode}). Revisa tu conexión e inténtalo de nuevo.`;
       setWatchMessage(message);
     } finally {

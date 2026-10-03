@@ -2,19 +2,17 @@ import { useState } from "react";
 import { useToast } from "../hooks/useToast";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Picker } from "@react-native-picker/picker";
-import { User } from "firebase/auth";
-import { saveUserProfile } from "../services/userService";
 import { UserProfile } from "../types";
 import { PROVINCES_AR, FIXED_COUNTRY, FIXED_COUNTRY_LABEL } from "../constants";
 import { formatBirthDateInput, toISODate } from "../utils/date";
-import { validateProfile, getFirstValidationError } from "../utils/validation";
+import { validateProfile, getFirstValidationError, normalizeDNI } from "../utils/validation";
 
 export function ProfileSetupScreen({
-  user,
-  onSaved,
+  onSaveProfile,
+  saving,
 }: {
-  user: User;
-  onSaved: (profile: UserProfile) => void;
+  onSaveProfile: (profile: UserProfile) => Promise<void>;
+  saving: boolean;
 }) {
   const [fullName, setFullName] = useState("");
   const [dni, setDni] = useState("");
@@ -22,13 +20,12 @@ export function ProfileSetupScreen({
   const [province, setProvince] = useState("BA");
   const [birthDateISO, setBirthDateISO] = useState("");
   const [birthDateDisplay, setBirthDateDisplay] = useState("");
-  const [saving, setSaving] = useState(false);
   const { showToast } = useToast();
 
   const handleSave = async () => {
     const profile: UserProfile = {
       fullName: fullName.trim(),
-      dni: dni.trim(),
+      dni: normalizeDNI(dni),
       phone: phone.trim(),
       country: FIXED_COUNTRY,
       province,
@@ -43,14 +40,25 @@ export function ProfileSetupScreen({
     }
 
     try {
-      setSaving(true);
-      await saveUserProfile(user.uid, profile, user.email);
+      await onSaveProfile(profile);
       showToast({ text: "Tus datos se guardaron correctamente.", type: "success" });
-      onSaved(profile);
     } catch (error) {
-      showToast({ text: "No se pudieron guardar tus datos: " + (error instanceof Error ? error.message : String(error)), type: "error" });
-    } finally {
-      setSaving(false);
+      const errorCode =
+        typeof error === "object" && error !== null && "code" in error
+          ? String(error.code)
+          : null;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Failed to save user profile:", error);
+      const visibleMessage =
+        errorMessage === "DNI_ALREADY_REGISTERED"
+          ? "Ese DNI ya está asociado a otra cuenta."
+          : errorMessage === "UNAUTHENTICATED"
+            ? "La sesión venció. Inicia sesión y vuelve a intentarlo."
+            : errorMessage;
+      Alert.alert(
+        "No se pudieron guardar tus datos",
+        errorCode ? `${errorCode}: ${visibleMessage}` : visibleMessage
+      );
     }
   };
 

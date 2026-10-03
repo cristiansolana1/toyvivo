@@ -1,13 +1,11 @@
 import React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useToast } from "../hooks/useToast";
 import { Alert, Linking, RefreshControl, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
-import { SkeletonLoader } from "../components/SkeletonLoader";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 import { useWatchedUsers } from "../hooks/useWatchedUsers";
 import { useContactRequests } from "../hooks/useContactRequests";
 import { useSurvey } from "../hooks/useSurvey";
-import { useProfile } from "../hooks/useProfile";
 import { HeartbeatButton } from "../components/HeartbeatButton";
 import { WatchedUserCard } from "../components/WatchedUserCard";
 import { ProfileEditor } from "../components/ProfileEditor";
@@ -20,23 +18,18 @@ import { UserProfile } from "../types";
 export function HomeScreen({
   user,
   profile,
-  onProfileUpdated,
+  onSaveProfile,
+  saving,
   onSignOut,
 }: {
   user: User | null;
   profile: UserProfile | null;
-  onProfileUpdated: (profile: UserProfile) => void;
+  onSaveProfile: (profile: UserProfile) => Promise<void>;
+  saving: boolean;
   onSignOut: () => Promise<void>;
 }) {
   if (!user) return null;
-
-  const { profile: currentProfile, loading, saving, saveProfile } = useProfile(user.uid, profile ?? undefined) as {
-    profile: UserProfile | null;
-    loading: boolean;
-    saving: boolean;
-    saveProfile: (profile: UserProfile) => Promise<boolean>;
-    setProfile: (profile: UserProfile | null) => void;
-  };
+  const currentProfile = profile;
 
   const {
     lastHeartbeat,
@@ -95,17 +88,12 @@ export function HomeScreen({
     });
   }, [watchedUsers]);
 
-  const handleSaveProfile = async (updatedProfile: any): Promise<boolean> => {
+  const handleSaveProfile = async (updatedProfile: UserProfile): Promise<boolean> => {
     try {
       clearEntryError();
-      const success = await saveProfile(updatedProfile);
-      if (success) {
-        onProfileUpdated(updatedProfile);
-        setShowProfileEditor(false);
-        return true;
-      }
-      setEntryError("No se pudieron guardar los cambios. Inténtalo de nuevo.");
-      return false;
+      await onSaveProfile(updatedProfile);
+      setShowProfileEditor(false);
+      return true;
     } catch (error) {
       clearEntryError();
       setEntryError("Error al guardar: " + (error instanceof Error ? error.message : "Error desconocido"));
@@ -159,15 +147,6 @@ export function HomeScreen({
       showToast({ text: "No se pudo abrir WhatsApp.", type: "error" });
     }
   };
-
-  if (loading) {
-    return (
-      <View style={styles.loadingWrap}>
-        <SkeletonLoader variant="text" width={200} height={30} animated={true} />
-        <Text style={styles.subtitle}>Cargando perfil...</Text>
-      </View>
-    );
-  }
 
   return (
     <ScrollView
@@ -451,12 +430,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 14,
     textAlign: "center",
-  },
-  loadingWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 40,
   },
   errorBanner: {
     backgroundColor: "#f8d7da",

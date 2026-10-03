@@ -1,53 +1,16 @@
 import {
   collection,
-  deleteField,
   doc,
   getDoc,
   onSnapshot,
+  query,
   serverTimestamp,
   setDoc,
+  where,
   writeBatch,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
-import { UserProfile } from "../types";
-import { saveUserProfile as saveLocalProfile, loadUserProfile as loadLocalProfile } from "../storage";
-
-export async function saveUserProfile(
-  uid: string,
-  profile: UserProfile,
-  email?: string | null
-): Promise<void> {
-  const previousProfile = await loadLocalProfile(uid);
-  await saveLocalProfile(uid, profile);
-  const userRef = doc(db, "users", uid);
-  const batch = writeBatch(db);
-  batch.set(userRef, {
-    publicProfile: {
-      fullName: profile.fullName,
-      country: profile.country,
-      province: profile.province,
-      dni: deleteField(),
-      phone: deleteField(),
-      birthDate: deleteField(),
-    },
-    ...(email ? { emailNormalized: email.trim().toLowerCase() } : {}),
-    profileUpdatedAt: serverTimestamp(),
-  }, { merge: true });
-  batch.set(doc(db, "users", uid, "private", "profile"), profile);
-  if (previousProfile?.dni && previousProfile.dni !== profile.dni) {
-    batch.delete(doc(db, "dniLookups", previousProfile.dni));
-  }
-  batch.set(doc(db, "dniLookups", profile.dni), { uid });
-  batch.set(doc(db, "userStatus", uid), {
-    fullName: profile.fullName,
-    phone: profile.phone,
-  }, { merge: true });
-  await batch.commit();
-}
-
-export async function loadUserProfile(uid: string): Promise<UserProfile | null> {
-  return loadLocalProfile(uid);
-}
+import { loadUserProfile as loadLocalProfile } from "../storage";
 
 export async function requestContactByDni(
   dni: string,
@@ -95,6 +58,31 @@ export function subscribeToWatchingUserIds(
   return onSnapshot(collection(db, "users", uid, "watching"), (snapshot) => {
     onUpdate(snapshot.docs.map((contact) => contact.id));
   }, onError);
+}
+
+export type ContactRequest = {
+  requesterUid: string;
+  requesterName: string;
+};
+
+export function subscribeToContactRequests(
+  uid: string,
+  onUpdate: (requests: ContactRequest[]) => void,
+  onError?: () => void
+): () => void {
+  const requestsQuery = query(
+    collection(db, "users", uid, "contactRequests"),
+    where("status", "==", "pending")
+  );
+
+  return onSnapshot(
+    requestsQuery,
+    (snapshot) => onUpdate(snapshot.docs.map((request) => ({
+      requesterUid: request.id,
+      requesterName: request.data().requesterName ?? "Usuario de Estoy Bien",
+    }))),
+    onError
+  );
 }
 
 export async function respondToContactRequest(requesterUid: string, approved: boolean): Promise<void> {

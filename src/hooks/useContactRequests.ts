@@ -1,14 +1,9 @@
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db } from "../firebase";
 import {
+  ContactRequest,
   respondToContactRequest,
+  subscribeToContactRequests,
 } from "../services/userService";
-
-export type ContactRequest = {
-  requesterUid: string;
-  requesterName: string;
-};
 
 export function useContactRequests(userId: string) {
   const [requests, setRequests] = useState<ContactRequest[]>([]);
@@ -16,17 +11,10 @@ export function useContactRequests(userId: string) {
   const [respondingUid, setRespondingUid] = useState<string | null>(null);
 
   useEffect(() => {
-    const requestsQuery = query(
-      collection(db, "users", userId, "contactRequests"),
-      where("status", "==", "pending")
-    );
-    return onSnapshot(
-      requestsQuery,
-      (snapshot) => {
-        setRequests(snapshot.docs.map((request) => ({
-          requesterUid: request.id,
-          requesterName: request.data().requesterName ?? "Usuario de Estoy Bien",
-        })));
+    return subscribeToContactRequests(
+      userId,
+      (updatedRequests) => {
+        setRequests(updatedRequests);
         setError(null);
       },
       () => setError("No se pudieron cargar las solicitudes de contacto.")
