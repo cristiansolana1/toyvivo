@@ -505,3 +505,42 @@ textarea:focus { border-color: #286052; box-shadow: 0 0 0 3px #28605220; }
 .skeleton-row.medium { width: 80%; }
 .skeleton-row.long { width: 100%; }
 .skeleton-card { padding: 24px; background: #fffdf8; border: 1px solid #d5dfd8; border-radius: 8px; margin-bottom: 16px; }
+
+/* ===== GEO HEATMAP ===== */
+.geo-heatmap-section { margin-top: 34px; padding-top: 34px; border-top: 1px solid #c4d3ca; }
+
+.geo-heatmap { margin-top: 20px; }
+
+.geo-heatmap-loading { text-align: center; padding: 40px; color: #6e8279; }
+
+.geo-heatmap-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; padding: 20px; background: #f8faf7; border: 1px solid #e8efe9; border-radius: 8px; }
+
+.geo-summary-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+.geo-summary-value { color: #15231f; font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; }
+
+.geo-summary-label { color: #6e8279; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+
+.geo-heatmap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+
+.geo-province-card { background: #fffdf8; border: 1px solid #e8efe9; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 8px; transition: transform 0.2s, box-shadow 0.2s; position: relative; }
+
+.geo-province-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px #24443815; }
+
+.geo-province-name { color: #15231f; font-weight: 600; font-size: 14px; }
+
+.geo-province-count { color: #286052; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; }
+
+.geo-province-bar { height: 6px; background: var(--province-color, #286052); border-radius: 3px; transition: width 0.3s ease; }
+
+.geo-heatmap-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e8efe9; justify-content: center; }
+
+.geo-legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #38564b; }
+
+.geo-legend-color { width: 12px; height: 12px; border-radius: 3px; }
+
+@media (max-width: 700px) {
+  .geo-heatmap-grid { grid-template-columns: 1fr; }
+  .geo-heatmap-summary { grid-template-columns: repeat(2, 1fr); }
+  .geo-heatmap-legend { gap: 8px; }
+}

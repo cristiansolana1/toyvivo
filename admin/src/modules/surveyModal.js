@@ -2,7 +2,7 @@ import { doc, updateDoc, addDoc, collection, serverTimestamp } from "https://www
 import { getDbInstance } from "./firebase.js";
 import { formatDateTimeForInput, escapeHtml } from "./utils.js";
 import { getAdminEmail } from "./auth.js";
-import { initDateTimePicker } from "./datetimePicker.js";
+import { initDateTimePicker, updateTriggerDisplay } from "./datetimePicker.js";
 
 const db = getDbInstance();
 const ADMIN_EMAIL = getAdminEmail();
@@ -93,6 +93,10 @@ export function closeSurveyModal() {
 }
 
 export function setupSurveyModal() {
+  document.querySelector("#new-survey-btn").addEventListener("click", () => {
+    openSurveyModal(null);
+  });
+
   document.querySelector("#survey-modal-add-option").addEventListener("click", () => {
     const optionsContainer = document.querySelector("#survey-modal-options");
     const optionCount = optionsContainer.querySelectorAll(".survey-option").length;

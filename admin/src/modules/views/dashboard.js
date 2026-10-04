@@ -2,6 +2,7 @@ import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/
 import { getDbInstance } from "../../modules/firebase.js";
 import { formatDate, showSkeleton } from "../../modules/utils.js";
 import { loadSurveyResults } from "../../modules/surveyResults.js";
+import { loadGeoHeatmap } from "../../modules/geoHeatmap.js";
 
 const db = getDbInstance();
 
@@ -38,7 +39,11 @@ export async function loadDashboard() {
       latestUser.innerHTML = `${name}<small>${formatDate(latest.lastAliveAt)}</small>`;
     }
     
-    await loadSurveyResults();
+    await Promise.all([
+      loadSurveyResults(),
+      loadGeoHeatmap()
+    ]);
+    
     dashboardMessage.textContent = `Actualizado: ${new Date().toLocaleTimeString("es-ES")}`;
   } catch (error) {
     console.error("[Admin] Error loading dashboard:", error);

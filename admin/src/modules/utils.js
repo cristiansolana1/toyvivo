@@ -1,22 +1,40 @@
-// ===== DATE FORMATTING =====
+// ===== DATE FORMATTING (Local Time) =====
+
+function toDateObj(timestamp) {
+  if (!timestamp) return null;
+  // Handle Firestore Timestamp, JavaScript Date, or ISO string
+  if (typeof timestamp.toDate === "function") return timestamp.toDate();
+  if (timestamp instanceof Date) return timestamp;
+  if (typeof timestamp === "string") return new Date(timestamp);
+  if (typeof timestamp === "number") return new Date(timestamp);
+  return null;
+}
 
 export function formatDate(timestamp) {
-  if (!timestamp?.toDate) return "Sin aviso registrado";
-  return timestamp.toDate().toLocaleString("es-ES");
+  const date = toDateObj(timestamp);
+  if (!date) return "Sin aviso registrado";
+  return date.toLocaleString("es-ES");
 }
 
 export function formatDateTime(timestamp) {
-  if (!timestamp?.toDate) return "—";
-  return timestamp.toDate().toLocaleString("es-ES");
+  const date = toDateObj(timestamp);
+  if (!date) return "—";
+  return date.toLocaleString("es-ES");
 }
 
 export function formatDateTimeForInput(timestamp) {
-  if (!timestamp?.toDate) return "";
-  const date = timestamp.toDate();
-  return date.toISOString().slice(0, 16);
+  const date = toDateObj(timestamp);
+  if (!date) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
 export function formatChartDate(date) {
+  if (!date) return "";
   return date.toLocaleDateString("es-ES", { month: "short", day: "numeric" });
 }
 

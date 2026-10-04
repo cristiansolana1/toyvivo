@@ -3,6 +3,7 @@ import {
   query, orderBy, writeBatch, serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getDbInstance } from "./firebase.js";
+import { loadSurveyResults } from "./surveyResults.js";
 import { 
   formatDate, formatDateTime, escapeHtml, showErrorBoundary, 
   showSkeleton, getSurveyStatus, getTargetingDisplay, PROVINCES_AR 

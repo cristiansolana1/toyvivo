@@ -12,90 +12,18 @@ import { formatDate, escapeHtml, showErrorBoundary } from "./modules/utils.js";
 import { setupLoginPage } from "./pages/login.js";
 import { setupDashboardPage } from "./pages/dashboard.js";
 
-const dashboardMessage = document.querySelector("#dashboard-message");
-
-// Main survey form elements
-const surveyForm = document.querySelector("#survey-form");
-const surveyOptions = document.querySelector("#survey-options");
-const addOptionButton = document.querySelector("#add-option-button");
-const surveyMessage = document.querySelector("#survey-message");
-const surveyResults = document.querySelector("#survey-results");
-const surveyStart = document.querySelector("#survey-start");
-const surveyEnd = document.querySelector("#survey-end");
-
 // Initialize Firebase when config is available
 function initApp() {
   if (window.FIREBASE_CONFIG) {
     initFirebase(window.FIREBASE_CONFIG);
-    setupEventListeners();
     setupSidebarNavigation();
     setupModals();
-    setupMainSurveyForm();
     setupLoginPage();
     setupDashboardPage();
   } else {
     // Wait for firebase-config.js to load
     setTimeout(initApp, 50);
   }
-}
-
-function setupEventListeners() {
-  // Add option button (main form)
-  addOptionButton.addEventListener("click", () => {
-    const optionCount = surveyOptions.querySelectorAll(".survey-option").length;
-    if (optionCount >= 4) {
-      surveyMessage.textContent = "Una encuesta puede tener como máximo 4 respuestas.";
-      return;
-    }
-    const label = document.createElement("label");
-    label.innerHTML = `Respuesta ${optionCount + 1}<input class="survey-option" type="text" required />`;
-    surveyOptions.append(label);
-  });
-  
-  // Main survey form submit
-  surveyForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    surveyMessage.textContent = "Publicando encuesta...";
-    const question = document.querySelector("#survey-question").value.trim();
-    const options = [...surveyOptions.querySelectorAll(".survey-option")]
-      .map((input) => input.value.trim())
-      .filter(Boolean);
-    const startValue = surveyStart.value;
-    const endValue = surveyEnd.value;
-
-    if (options.length < 2 || options.length > 4) {
-      surveyMessage.textContent = "Agrega entre 2 y 4 respuestas.";
-      return;
-    }
-
-    const surveyData = {
-      question,
-      options,
-      active: true,
-      createdAt: serverTimestamp(),
-      createdBy: "cristiansolana1@gmail.com",
-    };
-
-    if (startValue) surveyData.startAt = new Date(startValue);
-    if (endValue) surveyData.endAt = new Date(endValue);
-
-    try {
-      const { addDoc, collection, serverTimestamp } = await import("https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js");
-      const { getDbInstance } = await import("./modules/firebase.js");
-      const db = getDbInstance();
-      
-      await addDoc(collection(db, "surveys"), surveyData);
-      surveyForm.reset();
-      updateTriggerDisplay(surveyStart);
-      updateTriggerDisplay(surveyEnd);
-      surveyMessage.textContent = "Encuesta publicada correctamente.";
-      await loadDashboard();
-    } catch (error) {
-      surveyMessage.textContent = error.code === "permission-denied"
-        ? "Firestore rechazó la escritura. Publica la regla create de surveys para el administrador."
-        : `No se pudo publicar (${error.code ?? "error desconocido"}).`;
-    }
-  });
 }
 
 function setupSidebarNavigation() {
@@ -189,16 +117,9 @@ function setupModals() {
     }
   });
   
-  // User modal close
+// User modal close
   document.querySelector("#user-modal-close").addEventListener("click", closeUserModal);
   document.querySelector("#user-modal").querySelector(".modal-backdrop").addEventListener("click", closeUserModal);
-}
-
-function setupMainSurveyForm() {
-  initDateTimePicker("#survey-start-picker", "#survey-start");
-  initDateTimePicker("#survey-end-picker", "#survey-end");
-  updateTriggerDisplay(surveyStart);
-  updateTriggerDisplay(surveyEnd);
 }
 
 // Initialize app
