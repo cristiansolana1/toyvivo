@@ -81,51 +81,6 @@
               </article>
             </section>
 
-            <section class="survey-section" aria-labelledby="survey-heading">
-              <div>
-                <p class="eyebrow">Participación</p>
-                <h2 id="survey-heading">Crear encuesta</h2>
-                <p class="section-intro">Publica una pregunta para que los usuarios la respondan una sola vez.</p>
-              </div>
-              <form id="survey-form" class="survey-form">
-                <label>
-                  Pregunta
-                  <textarea id="survey-question" rows="3" required placeholder="Escribe la pregunta"></textarea>
-                </label>
-                <div class="survey-datetime">
-                  <label class="datetime-picker-wrapper">
-                    <span>Inicio</span>
-                    <div class="datetime-picker" id="survey-start-picker">
-                      <input type="hidden" id="survey-start" />
-                      <button type="button" class="datetime-picker-trigger" aria-label="Seleccionar fecha y hora">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                        <span class="datetime-picker-display">Seleccionar</span>
-                      </button>
-                    </div>
-                  </label>
-                  <label class="datetime-picker-wrapper">
-                    <span>Fin</span>
-                    <div class="datetime-picker" id="survey-end-picker">
-                      <input type="hidden" id="survey-end" />
-                      <button type="button" class="datetime-picker-trigger" aria-label="Seleccionar fecha y hora">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                        <span class="datetime-picker-display">Seleccionar</span>
-                      </button>
-                    </div>
-                  </label>
-                </div>
-                <div id="survey-options" class="survey-options">
-                  <label>Respuesta 1<input class="survey-option" type="text" required /></label>
-                  <label>Respuesta 2<input class="survey-option" type="text" required /></label>
-                </div>
-                <div class="survey-actions">
-                  <button id="add-option-button" class="secondary-button" type="button">Agregar respuesta</button>
-                  <button class="primary-button" type="submit">Publicar encuesta</button>
-                </div>
-                <p id="survey-message" class="message" role="status"></p>
-              </form>
-            </section>
-
             <section class="survey-results-section" aria-labelledby="survey-results-heading">
               <div>
                 <p class="eyebrow">Resultados</p>
