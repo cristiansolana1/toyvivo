@@ -3,13 +3,14 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { HeartbeatEntry, UserProfile } from "./types";
 
-const profileKey = (uid: string) => `profile:${uid}`;
-const heartbeatHistoryKey = (uid: string) => `heartbeats:${uid}`;
-const lastHeartbeatKey = (uid: string) => `lastHeartbeat:${uid}`;
-const pendingHeartbeatsKey = (uid: string) => `pendingHeartbeats:${uid}`;
+// Use safe key characters (alphanumeric, ".", "-", "_") - replace ":" with "-"
+const safeProfileKey = (uid: string) => `profile-${uid}`;
+const safeHeartbeatHistoryKey = (uid: string) => `heartbeats-${uid}`;
+const safeLastHeartbeatKey = (uid: string) => `lastheartbeat-${uid}`;
+const safePendingHeartbeatsKey = (uid: string) => `pendingheartbeats-${uid}`;
 
 export async function saveUserProfile(uid: string, profile: UserProfile) {
-  const key = profileKey(uid);
+  const key = safeProfileKey(uid);
   const serializedProfile = JSON.stringify(profile);
   if (Platform.OS === "web") {
     await AsyncStorage.setItem(key, serializedProfile);
@@ -21,7 +22,7 @@ export async function saveUserProfile(uid: string, profile: UserProfile) {
 }
 
 export async function loadUserProfile(uid: string): Promise<UserProfile | null> {
-  const key = profileKey(uid);
+  const key = safeProfileKey(uid);
   let rawProfile: string | null;
   if (Platform.OS === "web") {
     rawProfile = await AsyncStorage.getItem(key);
@@ -43,37 +44,37 @@ export async function loadUserProfile(uid: string): Promise<UserProfile | null> 
 }
 
 export async function saveHeartbeat(uid: string, heartbeat: HeartbeatEntry) {
-  const rawHistory = await AsyncStorage.getItem(heartbeatHistoryKey(uid));
+  const rawHistory = await AsyncStorage.getItem(safeHeartbeatHistoryKey(uid));
   const history = rawHistory ? (JSON.parse(rawHistory) as HeartbeatEntry[]) : [];
   const updatedHistory = [heartbeat, ...history].slice(0, 50);
 
-  await AsyncStorage.setItem(heartbeatHistoryKey(uid), JSON.stringify(updatedHistory));
-  await AsyncStorage.setItem(lastHeartbeatKey(uid), heartbeat.createdAt);
+  await AsyncStorage.setItem(safeHeartbeatHistoryKey(uid), JSON.stringify(updatedHistory));
+  await AsyncStorage.setItem(safeLastHeartbeatKey(uid), heartbeat.createdAt);
 }
 
 export async function loadLastHeartbeat(uid: string): Promise<string | null> {
-  return AsyncStorage.getItem(lastHeartbeatKey(uid));
+  return AsyncStorage.getItem(safeLastHeartbeatKey(uid));
 }
 
 export async function addPendingHeartbeat(uid: string, heartbeat: HeartbeatEntry): Promise<void> {
-  const raw = await AsyncStorage.getItem(pendingHeartbeatsKey(uid));
+  const raw = await AsyncStorage.getItem(safePendingHeartbeatsKey(uid));
   const pending = raw ? (JSON.parse(raw) as HeartbeatEntry[]) : [];
   pending.push(heartbeat);
-  await AsyncStorage.setItem(pendingHeartbeatsKey(uid), JSON.stringify(pending));
+  await AsyncStorage.setItem(safePendingHeartbeatsKey(uid), JSON.stringify(pending));
 }
 
 export async function getPendingHeartbeats(uid: string): Promise<HeartbeatEntry[]> {
-  const raw = await AsyncStorage.getItem(pendingHeartbeatsKey(uid));
+  const raw = await AsyncStorage.getItem(safePendingHeartbeatsKey(uid));
   return raw ? (JSON.parse(raw) as HeartbeatEntry[]) : [];
 }
 
 export async function clearPendingHeartbeats(uid: string): Promise<void> {
-  await AsyncStorage.removeItem(pendingHeartbeatsKey(uid));
+  await AsyncStorage.removeItem(safePendingHeartbeatsKey(uid));
 }
 
 export async function removePendingHeartbeat(uid: string, heartbeatId: string): Promise<void> {
-  const raw = await AsyncStorage.getItem(pendingHeartbeatsKey(uid));
+  const raw = await AsyncStorage.getItem(safePendingHeartbeatsKey(uid));
   const pending = raw ? (JSON.parse(raw) as HeartbeatEntry[]) : [];
   const filtered = pending.filter((h) => h.id !== heartbeatId);
-  await AsyncStorage.setItem(pendingHeartbeatsKey(uid), JSON.stringify(filtered));
+  await AsyncStorage.setItem(safePendingHeartbeatsKey(uid), JSON.stringify(filtered));
 }

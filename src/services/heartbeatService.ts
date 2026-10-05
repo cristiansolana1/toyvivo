@@ -24,13 +24,15 @@ async function persistHeartbeat(uid: string, heartbeat: HeartbeatEntry): Promise
   batch.set(userRef, { lastAliveAt: serverTimestamp() }, { merge: true });
 
   const profile = await loadUserProfile(uid);
+  const statusData: Record<string, any> = {
+    lastAliveAt: serverTimestamp(),
+    phone: "",  // Required by Firestore rules - default empty string
+  };
   if (profile) {
-    batch.set(doc(db, "userStatus", uid), {
-      fullName: profile.fullName,
-      phone: profile.phone,
-      lastAliveAt: serverTimestamp(),
-    }, { merge: true });
+    statusData.fullName = profile.fullName;
+    statusData.phone = profile.phone;  // Override with real phone if available
   }
+  batch.set(doc(db, "userStatus", uid), statusData, { merge: true });
 
   await batch.commit();
 }
