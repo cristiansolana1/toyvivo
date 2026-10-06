@@ -1,4 +1,5 @@
-import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, Pressable, View } from "react-native";
+import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, Pressable, View, Image, TouchableOpacity } from "react-native";
+import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 
 export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: any) => void }) {
@@ -16,12 +17,13 @@ export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: any)
     handlePasswordReset,
     toggleMode,
   } = useAuth();
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.screen}>
         <View style={styles.brandWrap}>
-          <Text style={styles.brandBadge}>AV</Text>
+          <Image source={require('../../assets/icon.png')} style={styles.appIcon} />
         </View>
 
         <Text style={styles.eyebrow}>Seguridad para tu familia</Text>
@@ -39,15 +41,23 @@ export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: any)
             onChangeText={setEmail}
             accessibilityLabel="Correo electrónico"
           />
-          <TextInput
-            style={styles.input}
-            secureTextEntry
-            placeholder="Contraseña"
-            placeholderTextColor="#64748b"
-            value={password}
-            onChangeText={setPassword}
-            accessibilityLabel="Contraseña"
-          />
+<TextInput
+              style={styles.input}
+              secureTextEntry={!isPasswordVisible}
+              placeholder="Contraseña"
+              placeholderTextColor="#64748b"
+              value={password}
+              onChangeText={setPassword}
+              accessibilityLabel="Contraseña"
+            />
+            <View style={styles.eyeContainer}>
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+              >
+                <Text>{isPasswordVisible ? "🙈" : "👁"}</Text>
+              </TouchableOpacity>
+            </View>
 
           {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
           {authNotice ? <Text style={styles.noticeText}>{authNotice}</Text> : null}
@@ -96,6 +106,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "800",
   },
+  appIcon: {
+    width: 64,
+    height: 64,
+    resizeMode: "contain",
+  },
   eyebrow: {
     color: "#b05b36",
     fontSize: 12,
@@ -122,10 +137,7 @@ const styles = StyleSheet.create({
     borderColor: "#d5dfd8",
     borderRadius: 18,
     padding: 18,
-    shadowColor: "#244438",
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 10 },
+    boxShadow: "0 10px 16px 0 rgba(36, 68, 56, 0.08)",
     elevation: 3,
   },
   errorText: {
@@ -176,5 +188,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#286052",
     fontWeight: "700",
+  },
+  eyeContainer: {
+    paddingRight: 12,
+  },
+  eyeButton: {
+    padding: 4,
+    color: "#64748b",
   },
 });
