@@ -1,10 +1,13 @@
 import {
   User,
   createUserWithEmailAndPassword,
+  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
 } from "firebase/auth";
-import { auth } from "../firebase";
+import { doc, writeBatch } from "firebase/firestore";
+import { auth, db } from "../firebase";
+import { clearUserData } from "../storage";
 
 export async function signIn(email: string, password: string): Promise<User> {
   const credential = await signInWithEmailAndPassword(auth, email, password);
@@ -13,11 +16,33 @@ export async function signIn(email: string, password: string): Promise<User> {
 
 export async function signUp(email: string, password: string): Promise<User> {
   const credential = await createUserWithEmailAndPassword(auth, email, password);
-  return credential.user;
+  const user = credential.user;
+  try {
+    await sendEmailVerification(user);
+  } catch (error) {
+    console.warn("Failed to send email verification:", error);
+  }
+  return user;
 }
 
 export async function sendPasswordReset(email: string): Promise<void> {
   await sendPasswordResetEmail(auth, email);
+}
+
+export async function deleteUserAccount(uid: string): Promise<void> {
+  const currentUser = auth.currentUser;
+  if (!currentUser || currentUser.uid !== uid) {
+    throw new Error("UNAUTHENTICATED");
+  }
+
+  const batch = writeBatch(db);
+  batch.delete(doc(db, "users", uid, "private", "profile"));
+  batch.delete(doc(db, "users", uid));
+  batch.delete(doc(db, "userStatus", uid));
+  await batch.commit();
+
+  await clearUserData(uid);
+  await currentUser.delete();
 }
 
 export function getAuthErrorMessage(error: unknown): string {

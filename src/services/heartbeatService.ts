@@ -1,4 +1,4 @@
-import { doc, serverTimestamp, writeBatch } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "../firebase";
 import { HeartbeatEntry } from "../types";
 import { 
@@ -26,11 +26,10 @@ async function persistHeartbeat(uid: string, heartbeat: HeartbeatEntry): Promise
   const profile = await loadUserProfile(uid);
   const statusData: Record<string, any> = {
     lastAliveAt: serverTimestamp(),
-    phone: "",  // Required by Firestore rules - default empty string
   };
   if (profile) {
     statusData.fullName = profile.fullName;
-    statusData.phone = profile.phone;  // Override with real phone if available
+    statusData.phone = profile.phone;
   }
   batch.set(doc(db, "userStatus", uid), statusData, { merge: true });
 
@@ -72,7 +71,28 @@ export async function syncPendingHeartbeats(uid: string): Promise<{ synced: numb
 }
 
 export async function loadLastHeartbeat(uid: string): Promise<string | null> {
-  return loadLocalLastHeartbeat(uid);
+  const localLast = await loadLocalLastHeartbeat(uid);
+  if (localLast) {
+    return localLast;
+  }
+
+  try {
+    const userDoc = await getDoc(doc(db, "users", uid));
+    if (userDoc.exists()) {
+      const data = userDoc.data();
+      const lastAliveAt = data.lastAliveAt;
+      if (lastAliveAt) {
+        const timestamp = typeof lastAliveAt.toDate === "function"
+          ? lastAliveAt.toDate().toISOString()
+          : new Date(lastAliveAt).toISOString();
+        return timestamp;
+      }
+    }
+  } catch (error) {
+    console.error("Error loading last heartbeat from Firestore:", error);
+  }
+
+  return null;
 }
 
 export { getPendingHeartbeats } from "../storage";

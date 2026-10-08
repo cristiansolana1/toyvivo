@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { AppState } from "react-native";
 import { getUnansweredSurvey, submitSurveyResponse } from "../services/surveyService";
 import { Survey, UserProfile } from "../types";
 
@@ -10,6 +11,7 @@ interface UseSurveyReturn {
   surveyMessage: string | null;
   submittingSurvey: boolean;
   handleSurveySubmit: () => Promise<void>;
+  loadSurvey: () => Promise<void>;
 }
 
 export function useSurvey(userId: string, userProfile?: UserProfile): UseSurveyReturn {
@@ -21,10 +23,6 @@ export function useSurvey(userId: string, userProfile?: UserProfile): UseSurveyR
 
   const userCountry = userProfile?.country;
   const userProvince = userProfile?.province;
-
-  useEffect(() => {
-    loadSurvey();
-  }, [userId, userCountry, userProvince]);
 
   const loadSurvey = useCallback(async () => {
     try {
@@ -41,6 +39,20 @@ export function useSurvey(userId: string, userProfile?: UserProfile): UseSurveyR
       setSurveyMessage("No se pudo cargar la encuesta.");
     }
   }, [userId, userCountry, userProvince]);
+
+  useEffect(() => {
+    loadSurvey();
+
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") {
+        void loadSurvey();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [loadSurvey]);
 
   const handleSurveySubmit = useCallback(async () => {
     if (!survey || !surveyAnswer || surveySubmitted) return;
@@ -70,5 +82,6 @@ export function useSurvey(userId: string, userProfile?: UserProfile): UseSurveyR
     surveyMessage,
     submittingSurvey,
     handleSurveySubmit,
+    loadSurvey,
   };
 }

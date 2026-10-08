@@ -2,6 +2,7 @@ import React from "react";
 import { useCallback, useMemo, useState } from "react";
 import { useToast } from "../hooks/useToast";
 import { Alert, Linking, RefreshControl, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 import { useWatchedUsers } from "../hooks/useWatchedUsers";
 import { useContactRequests } from "../hooks/useContactRequests";
@@ -14,6 +15,7 @@ import { AddUserForm } from "../components/AddUserForm";
 import { isHeartbeatOverdue, formatHeartbeatCountdown, FIXED_COUNTRY_LABEL, PROVINCES_AR } from "../constants";
 import { User } from "firebase/auth";
 import { UserProfile } from "../types";
+import { deleteUserAccount } from "../services/authService";
 
 export function HomeScreen({
   user,
@@ -30,6 +32,7 @@ export function HomeScreen({
 }) {
   if (!user) return null;
   const currentProfile = profile;
+  const insets = useSafeAreaInsets();
 
   const {
     lastHeartbeat,
@@ -69,6 +72,7 @@ export function HomeScreen({
     surveyMessage,
     submittingSurvey,
     handleSurveySubmit,
+    loadSurvey,
   } = useSurvey(user.uid, currentProfile ?? undefined);
 
   const [showProfileEditor, setShowProfileEditor] = useState(false);
@@ -112,7 +116,7 @@ export function HomeScreen({
     }
   };
 
-  const callWatchedUser = async (phone: string) => {
+  const callWatchedUser = useCallback(async (phone: string) => {
     const sanitizedPhone = phone.replace(/[^0-9+]/g, "");
     if (!sanitizedPhone || sanitizedPhone.replace(/[^0-9]/g, "").length < 5) {
       showToast({ text: "Este usuario no tiene teléfono registrado.", type: "error" });
@@ -125,9 +129,9 @@ export function HomeScreen({
     } catch {
       showToast({ text: "No se pudo abrir la aplicación de llamadas.", type: "error" });
     }
-  };
+  }, [showToast]);
 
-  const messageWatchedUser = async (phone: string) => {
+  const messageWatchedUser = useCallback(async (phone: string) => {
     const digits = phone.replace(/\D/g, "");
     if (!digits || digits.length < 8) {
       showToast({ text: "Este usuario no tiene teléfono registrado.", type: "error" });
@@ -146,26 +150,28 @@ export function HomeScreen({
     } catch {
       showToast({ text: "No se pudo abrir WhatsApp.", type: "error" });
     }
-  };
+  }, [showToast]);
 
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={async () => {
           setRefreshing(true);
           try {
-            await syncPending();
-            // The useWatchedUsers hook already subscribes to real-time updates,
-            // so watched users will update automatically.
+            await Promise.all([
+              syncPending(),
+              loadSurvey(),
+            ]);
           } finally {
             setRefreshing(false);
           }
         }}
         />
       }
-      contentContainerStyle={styles.screen}>
+      contentContainerStyle={[styles.screen, { paddingBottom: Math.max(insets.bottom + 32, 56) }]}>
       <View style={styles.statusCard}>
         <View>
           <Text style={styles.statusLabel}>Estado actual</Text>
@@ -224,6 +230,10 @@ export function HomeScreen({
           onSave={handleSaveProfile}
           onCancel={() => setShowProfileEditor(false)}
           saving={saving}
+          onDelete={async () => {
+            await deleteUserAccount(user.uid);
+            await onSignOut();
+          }}
         />
       ) : null}
 
@@ -258,7 +268,10 @@ export function HomeScreen({
       <AddUserForm
         value={watchDni}
         onChangeText={setWatchDni}
-        onSubmit={() => addWatchedUser(watchDni)}
+        onSubmit={async () => {
+          const ok = await addWatchedUser(watchDni);
+          if (ok) setWatchDni("");
+        }}
         disabled={addingWatch}
         message={watchMessage}
       />

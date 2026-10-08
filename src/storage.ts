@@ -78,3 +78,16 @@ export async function removePendingHeartbeat(uid: string, heartbeatId: string): 
   const filtered = pending.filter((h) => h.id !== heartbeatId);
   await AsyncStorage.setItem(safePendingHeartbeatsKey(uid), JSON.stringify(filtered));
 }
+
+export async function clearUserData(uid: string): Promise<void> {
+  const key = safeProfileKey(uid);
+  if (Platform.OS === "web") {
+    await AsyncStorage.removeItem(key);
+  } else {
+    await SecureStore.deleteItemAsync(key).catch(() => {});
+    await AsyncStorage.removeItem(key);
+  }
+  await AsyncStorage.removeItem(safeHeartbeatHistoryKey(uid));
+  await AsyncStorage.removeItem(safeLastHeartbeatKey(uid));
+  await AsyncStorage.removeItem(safePendingHeartbeatsKey(uid));
+}

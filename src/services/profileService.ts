@@ -74,11 +74,6 @@ export async function hydrateUserProfile(
 ): Promise<UserProfile | null> {
   const localProfile = await loadLocalProfile(uid);
   if (localProfile) {
-    try {
-      await saveUserProfile(uid, localProfile, email);
-    } catch {
-      // Keep the cached profile usable and retry cloud migration on a later startup.
-    }
     return localProfile;
   }
 

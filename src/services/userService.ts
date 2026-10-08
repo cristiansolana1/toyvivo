@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  documentId,
   getDoc,
   onSnapshot,
   query,
@@ -137,18 +138,22 @@ export function subscribeToWatchedUsers(
 ): () => void {
   if (userIds.length === 0) return () => {};
 
-  const unsubscribers = userIds.map((watchedUserId) =>
-    onSnapshot(doc(db, "userStatus", watchedUserId), (snapshot) => {
-      if (!snapshot.exists()) return;
-      const data = snapshot.data();
-      onUpdate({
-        uid: watchedUserId,
-        fullName: data.fullName ?? "Usuario",
-        phone: data.phone ?? "",
-        lastAliveAt: data.lastAliveAt?.toDate?.()?.toISOString?.() ?? null,
-      });
-    }, onError)
-  );
+  const unsubscribers = userIds.map((uid) => {
+    return onSnapshot(
+      doc(db, "userStatus", uid),
+      (docSnap) => {
+        if (!docSnap.exists()) return;
+        const data = docSnap.data();
+        onUpdate({
+          uid: docSnap.id,
+          fullName: data.fullName ?? "Usuario",
+          phone: data.phone ?? "",
+          lastAliveAt: data.lastAliveAt?.toDate?.()?.toISOString?.() ?? null,
+        });
+      },
+      onError
+    );
+  });
 
   return () => unsubscribers.forEach((unsub) => unsub());
 }

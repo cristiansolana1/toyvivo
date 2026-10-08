@@ -7,6 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "test:unit": "node --experimental-strip-types --test tests/validation.test.ts tests/constants.test.ts",
     "test:rules": "npx firebase-tools emulators:exec --project demo-estoybien-rules --only firestore \"node --test tests/firestore.rules.test.mjs\""
   },
   "dependencies": {
@@ -17,6 +18,7 @@
     "@react-navigation/native-stack": "^7.14.10",
     "expo": "^57.0.27",
     "expo-dev-client": "~57.0.19",
+    "expo-notifications": "~57.0.22",
     "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
     "expo-updates": "^57.0.25",
@@ -30,6 +32,7 @@
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",
+    "@react-native-community/cli": "^20.2.0",
     "@types/react": "~19.2.4",
     "typescript": "~6.0.3"
   },

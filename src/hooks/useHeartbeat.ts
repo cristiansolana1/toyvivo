@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import NetInfo from "@react-native-community/netinfo";
 import { sendHeartbeat, loadLastHeartbeat, syncPendingHeartbeats, getPendingHeartbeats } from "../services/heartbeatService";
+import { scheduleHeartbeatReminder, requestNotificationPermissions, sendHeartbeatAvailableNotification } from "../services/notificationService";
 import { HeartbeatEntry } from "../types";
 import { isHeartbeatOverdue, formatHeartbeatCountdown, HEARTBEAT_LIMIT_MS } from "../constants";
 
@@ -58,6 +59,11 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
       if (result.queued) {
         setPendingCount((prev) => prev + 1);
       }
+      void requestNotificationPermissions().then((granted) => {
+        if (granted) {
+          void scheduleHeartbeatReminder(22);
+        }
+      });
     } catch (error) {
       console.error("Error sending heartbeat:", error);
       setSending(false);
@@ -92,13 +98,13 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
   }, [userId, pendingCount, syncPending]);
 
   useEffect(() => {
-    const updatePending = async () => {
-      const pending = await getPendingHeartbeats(userId);
-      setPendingCount(pending.length);
+    let active = true;
+    getPendingHeartbeats(userId).then((pending: HeartbeatEntry[]) => {
+      if (active) setPendingCount(pending.length);
+    });
+    return () => {
+      active = false;
     };
-    updatePending();
-    const interval = setInterval(updatePending, 30000);
-    return () => clearInterval(interval);
   }, [userId]);
 
   const formattedLastHeartbeat = lastHeartbeat
@@ -107,6 +113,19 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
 
   const overdue = isHeartbeatOverdue(lastHeartbeat, currentTime);
   const countdownText = formatHeartbeatCountdown(lastHeartbeat, currentTime);
+
+  const prevOverdueRef = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    if (prevOverdueRef.current === false && overdue) {
+      void requestNotificationPermissions().then((granted) => {
+        if (granted) {
+          void sendHeartbeatAvailableNotification();
+        }
+      });
+    }
+    prevOverdueRef.current = overdue;
+  }, [overdue]);
 
   return {
     lastHeartbeat,

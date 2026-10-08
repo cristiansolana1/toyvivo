@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useToast } from "../hooks/useToast";
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Picker } from "@react-native-picker/picker";
 import { UserProfile } from "../types";
 import { PROVINCES_AR, FIXED_COUNTRY, FIXED_COUNTRY_LABEL } from "../constants";
@@ -21,6 +22,7 @@ export function ProfileSetupScreen({
   const [birthDateISO, setBirthDateISO] = useState("");
   const [birthDateDisplay, setBirthDateDisplay] = useState("");
   const { showToast } = useToast();
+  const insets = useSafeAreaInsets();
 
   const handleSave = async () => {
     const profile: UserProfile = {
@@ -63,7 +65,11 @@ export function ProfileSetupScreen({
   };
 
   return (
-    <View style={styles.screen}>
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      style={styles.container}
+      contentContainerStyle={[styles.screen, { paddingBottom: Math.max(insets.bottom + 40, 60) }]}
+    >
       <Text style={styles.title}>Tus datos personales</Text>
       <Text style={styles.subtitle}>Solo se solicita una vez para activar tus avisos de seguridad.</Text>
 
@@ -124,13 +130,16 @@ export function ProfileSetupScreen({
       <Pressable style={styles.primaryButton} onPress={handleSave} disabled={saving}>
         <Text style={styles.primaryButtonText}>{saving ? "Guardando..." : "Guardar datos"}</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  container: {
+    flex: 1,
     backgroundColor: "#edf3ef",
+  },
+  screen: {
     paddingHorizontal: 24,
     paddingVertical: 28,
   },
@@ -219,6 +228,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 4,
     marginBottom: 14,
+    minHeight: 48,
+    justifyContent: "center",
   },
   primaryButtonText: {
     color: "#fffdf8",

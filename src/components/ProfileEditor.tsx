@@ -3,35 +3,32 @@ import { useToast } from "../hooks/useToast";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { UserProfile } from "../types";
-import { PROVINCES_AR, FIXED_COUNTRY, FIXED_COUNTRY_LABEL } from "../constants";
-import { toDDMMYYYY, formatBirthDateInput, toISODate } from "../utils/date";
-import { validateProfile, getFirstValidationError, normalizeDNI } from "../utils/validation";
+import { PROVINCES_AR, FIXED_COUNTRY_LABEL } from "../constants";
+import { toDDMMYYYY } from "../utils/date";
+import { validateProfile, getFirstValidationError } from "../utils/validation";
 
 interface ProfileEditorProps {
   profile: UserProfile;
   onSave: (profile: UserProfile) => Promise<boolean>;
   onCancel: () => void;
   saving: boolean;
+  onDelete?: () => Promise<void>;
 }
 
-export function ProfileEditor({ profile, onSave, onCancel, saving }: ProfileEditorProps) {
-  const [fullName, setFullName] = useState(profile.fullName);
-  const [dni, setDni] = useState(profile.dni);
+export function ProfileEditor({ profile, onSave, onCancel, saving, onDelete }: ProfileEditorProps) {
   const [phone, setPhone] = useState(profile.phone);
   const [province, setProvince] = useState(profile.province ?? "BA");
-  const [birthDateISO, setBirthDateISO] = useState(profile.birthDate ?? "");
-  const [birthDateDisplay, setBirthDateDisplay] = useState(toDDMMYYYY(profile.birthDate ?? ""));
   const [localSaving, setLocalSaving] = useState(false);
   const { showToast } = useToast();
 
   const handleSave = async () => {
     const updatedProfile: UserProfile = {
-      fullName: fullName.trim(),
-      dni: normalizeDNI(dni),
+      fullName: profile.fullName,
+      dni: profile.dni,
       phone: phone.trim(),
-      country: FIXED_COUNTRY,
+      country: profile.country,
       province,
-      birthDate: birthDateISO,
+      birthDate: profile.birthDate,
     };
 
     const validationResults = validateProfile(updatedProfile);
@@ -51,21 +48,42 @@ export function ProfileEditor({ profile, onSave, onCancel, saving }: ProfileEdit
     }
   };
 
+  const handleDelete = () => {
+    Alert.alert(
+      "Eliminar cuenta",
+      "¿Estás seguro de que deseas eliminar tu cuenta permanentemente? Esta acción no se puede deshacer.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: async () => {
+            if (!onDelete) return;
+            try {
+              setLocalSaving(true);
+              await onDelete();
+            } catch (error) {
+              setLocalSaving(false);
+              Alert.alert(
+                "Error",
+                "No se pudo eliminar la cuenta. Es posible que debas iniciar sesión nuevamente antes de eliminarla por motivos de seguridad."
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.editor}>
-      <TextInput
-        style={styles.input}
-        placeholder="Nombre completo"
-        value={fullName}
-        onChangeText={setFullName}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="DNI"
-        keyboardType="number-pad"
-        value={dni}
-        onChangeText={(value) => setDni(value.replace(/[^0-9]/g, ""))}
-      />
+      <Text style={styles.fieldLabel}>Nombre completo (No editable)</Text>
+      <Text style={styles.readOnlyText}>{profile.fullName}</Text>
+
+      <Text style={styles.fieldLabel}>DNI (No editable)</Text>
+      <Text style={styles.readOnlyText}>{profile.dni}</Text>
+
+      <Text style={styles.fieldLabel}>Teléfono (Editable)</Text>
       <TextInput
         style={styles.input}
         placeholder="Teléfono"
@@ -73,9 +91,11 @@ export function ProfileEditor({ profile, onSave, onCancel, saving }: ProfileEdit
         value={phone}
         onChangeText={(value) => setPhone(value.replace(/[^0-9]/g, ""))}
       />
-      <Text style={styles.pickerLabel}>País</Text>
-      <Text style={styles.fixedCountryText}>{FIXED_COUNTRY_LABEL}</Text>
-      <Text style={styles.pickerLabel}>Provincia</Text>
+
+      <Text style={styles.fieldLabel}>País</Text>
+      <Text style={styles.readOnlyText}>{FIXED_COUNTRY_LABEL}</Text>
+
+      <Text style={styles.fieldLabel}>Provincia (Editable)</Text>
       <View style={styles.pickerWrapper}>
         <Picker
           style={styles.picker}
@@ -89,25 +109,17 @@ export function ProfileEditor({ profile, onSave, onCancel, saving }: ProfileEdit
         </Picker>
       </View>
 
-      <Text style={styles.pickerLabel}>Fecha de nacimiento</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="DD/MM/AAAA"
-        value={birthDateDisplay}
-        onChangeText={(value) => {
-          const formatted = formatBirthDateInput(value);
-          setBirthDateDisplay(formatted);
-          const iso = toISODate(formatted);
-          if (iso) setBirthDateISO(iso);
-        }}
-        keyboardType="numeric"
-        maxLength={10}
-      />
+      <Text style={styles.fieldLabel}>Fecha de nacimiento (No editable)</Text>
+      <Text style={styles.readOnlyText}>{toDDMMYYYY(profile.birthDate)}</Text>
+
       <Pressable style={styles.primaryButton} onPress={handleSave} disabled={saving || localSaving}>
         <Text style={styles.primaryButtonText}>{(saving || localSaving) ? "Guardando..." : "Guardar datos"}</Text>
       </Pressable>
       <Pressable style={styles.cancelButton} onPress={onCancel}>
         <Text style={styles.cancelButtonText}>Cancelar</Text>
+      </Pressable>
+      <Pressable style={styles.deleteButton} onPress={handleDelete} disabled={saving || localSaving}>
+        <Text style={styles.deleteButtonText}>Eliminar cuenta</Text>
       </Pressable>
     </View>
   );
@@ -132,12 +144,24 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontSize: 16,
   },
-  pickerLabel: {
+  fieldLabel: {
     fontSize: 14,
     fontWeight: "600",
     color: "#334155",
-    marginTop: 12,
+    marginTop: 8,
     marginBottom: 4,
+  },
+  readOnlyText: {
+    fontSize: 16,
+    color: "#64748b",
+    fontWeight: "600",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: "#e2e8f0",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 10,
+    marginBottom: 12,
   },
   picker: {
     height: 50,
@@ -151,23 +175,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#0f172a",
   },
-  fixedCountryText: {
-    fontSize: 16,
-    color: "#0f172a",
-    fontWeight: "600",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: "#f1f5f9",
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 10,
-    marginBottom: 12,
-  },
   primaryButton: {
     backgroundColor: "#0f172a",
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
     marginTop: 4,
     marginBottom: 8,
   },
@@ -181,11 +195,29 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
+    marginBottom: 8,
   },
   cancelButtonText: {
     color: "#0f172a",
     fontSize: 16,
     fontWeight: "600",
+  },
+  deleteButton: {
+    backgroundColor: "#fee2e2",
+    borderWidth: 1,
+    borderColor: "#fca5a5",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
+  },
+  deleteButtonText: {
+    color: "#b91c1c",
+    fontSize: 16,
+    fontWeight: "700",
   },
   pickerWrapper: {
     marginBottom: 12,

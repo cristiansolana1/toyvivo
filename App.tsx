@@ -2,7 +2,8 @@ import { SkeletonLoader } from "./src/components/SkeletonLoader";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet } from "react-native";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, SafeAreaView, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   User,
   onAuthStateChanged,
@@ -11,9 +12,11 @@ import {
 import { auth } from "./src/firebase";
 import { useProfile } from "./src/hooks/useProfile";
 import { AuthScreen } from "./src/screens/AuthScreen";
+import { VerifyEmailScreen } from "./src/screens/VerifyEmailScreen";
 import { ProfileSetupScreen } from "./src/screens/ProfileSetupScreen";
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
+import { clearUserData } from "./src/storage";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -78,52 +81,64 @@ export default function App() {
 
   if (bootLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loaderWrap}>
-          <SkeletonLoader variant="card" width={150} height={100} animated={true} />
-          <Text style={styles.subtitle}>Cargando aplicación...</Text>
-        </View>
-      </SafeAreaView>
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.loaderWrap}>
+            <SkeletonLoader variant="card" width={150} height={100} animated={true} />
+            <Text style={styles.subtitle}>Cargando aplicación...</Text>
+          </View>
+        </SafeAreaView>
+      </SafeAreaProvider>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ErrorBoundary>
-        {!user ? (
-          <>
-            {bootError ? <Text style={styles.errorText}>{bootError}</Text> : null}
-            <AuthScreen
-              onAccountCreated={(createdUser) => {
-                setUser(createdUser);
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.container}>
+        <ErrorBoundary>
+          {!user ? (
+            <>
+              {bootError ? <Text style={styles.errorText}>{bootError}</Text> : null}
+              <AuthScreen
+                onAccountCreated={(createdUser) => {
+                  setUser(createdUser);
+                }}
+              />
+            </>
+          ) : !user.emailVerified ? (
+            <VerifyEmailScreen
+              user={user}
+              onSignOut={handleSignOut}
+              onVerified={() => {
+                setUser({ ...user });
               }}
             />
-          </>
-        ) : profileLoading ? (
-          <View style={styles.loaderWrap}>
-            <SkeletonLoader variant="card" width={150} height={100} animated={true} />
-            <Text style={styles.subtitle}>Cargando tu perfil...</Text>
-          </View>
-        ) : !profile ? (
-          <>
-            {profileError ? <Text style={styles.errorText}>{profileError}</Text> : null}
-          <ProfileSetupScreen
-            onSaveProfile={saveProfile}
-            saving={profileSaving}
-          />
-          </>
-        ) : (
-          <HomeScreen
-            user={user}
-            profile={profile}
-            onSaveProfile={saveProfile}
-            saving={profileSaving}
-            onSignOut={handleSignOut}
-          />
-        )}
-      </ErrorBoundary>
-      <StatusBar style="auto" />
-    </SafeAreaView>
+          ) : profileLoading ? (
+            <View style={styles.loaderWrap}>
+              <SkeletonLoader variant="card" width={150} height={100} animated={true} />
+              <Text style={styles.subtitle}>Cargando tu perfil...</Text>
+            </View>
+          ) : !profile ? (
+            <>
+              {profileError ? <Text style={styles.errorText}>{profileError}</Text> : null}
+            <ProfileSetupScreen
+              onSaveProfile={saveProfile}
+              saving={profileSaving}
+            />
+            </>
+          ) : (
+            <HomeScreen
+              user={user}
+              profile={profile}
+              onSaveProfile={saveProfile}
+              saving={profileSaving}
+              onSignOut={handleSignOut}
+            />
+          )}
+        </ErrorBoundary>
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

@@ -1,5 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Linking, Alert } from "react-native";
+import React, { memo } from "react";
+import { Pressable, StyleSheet, Text, View, Alert } from "react-native";
 import { WatchedUserStatus } from "../services/userService";
 import { isHeartbeatOverdue } from "../constants";
 
@@ -11,12 +11,25 @@ interface WatchedUserCardProps {
   currentTime: number;
 }
 
-export function WatchedUserCard({ user, onCall, onWhatsApp, onRemove, currentTime }: WatchedUserCardProps) {
+function WatchedUserCardComponent({ user, onCall, onWhatsApp, onRemove, currentTime }: WatchedUserCardProps) {
   const overdue = isHeartbeatOverdue(user.lastAliveAt, currentTime);
 
   const handleCall = () => onCall(user.phone);
   const handleWhatsAppMessage = () => onWhatsApp(user.phone);
-  const handleRemove = () => onRemove(user.uid);
+  const handleRemove = () => {
+    Alert.alert(
+      "Quitar contacto",
+      `¿Seguro que deseas quitar a ${user.fullName} de tus contactos de seguridad?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Quitar",
+          style: "destructive",
+          onPress: () => onRemove(user.uid),
+        },
+      ]
+    );
+  };
 
   return (
     <View style={styles.card}>
@@ -47,6 +60,8 @@ export function WatchedUserCard({ user, onCall, onWhatsApp, onRemove, currentTim
     </View>
   );
 }
+
+export const WatchedUserCard = memo(WatchedUserCardComponent);
 
 const styles = StyleSheet.create({
   card: {

@@ -28,6 +28,18 @@ export function useAuth(): UseAuthReturn {
 
   const buttonLabel = isLoginMode ? "Iniciar sesión" : "Crear cuenta";
 
+  const handleEmailChange = useCallback((value: string) => {
+    setEmail(value);
+    setAuthError(null);
+    setAuthNotice(null);
+  }, []);
+
+  const handlePasswordChange = useCallback((value: string) => {
+    setPassword(value);
+    setAuthError(null);
+    setAuthNotice(null);
+  }, []);
+
   const handleSubmit = useCallback(
     async (onAccountCreated: (user: User) => void) => {
       const normalizedEmail = email.trim();
@@ -88,9 +100,9 @@ export function useAuth(): UseAuthReturn {
 
   return {
     email,
-    setEmail,
+    setEmail: handleEmailChange,
     password,
-    setPassword,
+    setPassword: handlePasswordChange,
     isLoginMode,
     setIsLoginMode,
     submitting,

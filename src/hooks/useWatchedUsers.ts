@@ -13,7 +13,7 @@ interface UseWatchedUsersReturn {
   watchedUsers: WatchedUserStatus[];
   addingWatch: boolean;
   watchMessage: string | null;
-  addWatchedUser: (dni: string) => Promise<void>;
+  addWatchedUser: (dni: string) => Promise<boolean>;
   removeWatchedUser: (targetUserId: string) => Promise<void>;
   setWatchMessage: (message: string | null) => void;
 }
@@ -45,12 +45,12 @@ export function useWatchedUsers(userId: string): UseWatchedUsersReturn {
     );
   }, [watchingUserIds]);
 
-  const addWatchedUser = useCallback(async (dni: string) => {
+  const addWatchedUser = useCallback(async (dni: string): Promise<boolean> => {
     const normalizedDni = dni.trim().replace(/\D/g, "");
     setWatchMessage(null);
     if (!normalizedDni) {
       setWatchMessage("Ingresa el DNI de la persona que quieres agregar.");
-      return;
+      return false;
     }
 
     try {
@@ -59,6 +59,7 @@ export function useWatchedUsers(userId: string): UseWatchedUsersReturn {
       setWatchMessage(result === "restored"
         ? "Este contacto ya te había autorizado. Se restauró en tu lista persistente."
         : "Solicitud enviada. Cuando la aprueben, verás aquí el estado y teléfono compartidos.");
+      return true;
     } catch (error) {
       const firebaseCode = error instanceof FirebaseError ? error.code : "unknown";
       const message = error instanceof Error && error.message === "INVALID_DNI"
@@ -77,6 +78,7 @@ export function useWatchedUsers(userId: string): UseWatchedUsersReturn {
                   ? "Firestore no permitió consultar o crear la solicitud. Revisa las reglas publicadas."
                   : `No se pudo agregar al usuario (${firebaseCode}). Revisa tu conexión e inténtalo de nuevo.`;
       setWatchMessage(message);
+      return false;
     } finally {
       setAddingWatch(false);
     }

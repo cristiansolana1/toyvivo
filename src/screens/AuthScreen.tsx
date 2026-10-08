@@ -1,8 +1,10 @@
 import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, Pressable, View, Image, TouchableOpacity } from "react-native";
 import { useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { User } from "firebase/auth";
 import { useAuth } from "../hooks/useAuth";
 
-export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: any) => void }) {
+export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: User) => void }) {
   const {
     email,
     setEmail,
@@ -18,10 +20,14 @@ export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: any)
     toggleMode,
   } = useAuth();
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const insets = useSafeAreaInsets();
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.screen}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[styles.screen, { paddingBottom: Math.max(insets.bottom + 40, 60) }]}
+      >
         <View style={styles.brandWrap}>
           <Image source={require('../../assets/icon.png')} style={styles.appIcon} />
         </View>
@@ -41,8 +47,10 @@ export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: any)
             onChangeText={setEmail}
             accessibilityLabel="Correo electrónico"
           />
-<TextInput
-              style={styles.input}
+
+          <View style={styles.passwordInputContainer}>
+            <TextInput
+              style={styles.passwordInput}
               secureTextEntry={!isPasswordVisible}
               placeholder="Contraseña"
               placeholderTextColor="#64748b"
@@ -50,14 +58,14 @@ export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: any)
               onChangeText={setPassword}
               accessibilityLabel="Contraseña"
             />
-            <View style={styles.eyeContainer}>
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-              >
-                <Text>{isPasswordVisible ? "🙈" : "👁"}</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.eyeButton}
+              onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+              accessibilityLabel={isPasswordVisible ? "Ocultar contraseña" : "Mostrar contraseña"}
+            >
+              <Text style={styles.eyeText}>{isPasswordVisible ? "🙈" : "👁"}</Text>
+            </TouchableOpacity>
+          </View>
 
           {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
           {authNotice ? <Text style={styles.noticeText}>{authNotice}</Text> : null}
@@ -66,13 +74,13 @@ export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: any)
             <Text style={styles.primaryButtonText}>{submitting ? "Procesando..." : buttonLabel}</Text>
           </Pressable>
 
-          <Pressable onPress={toggleMode}>
+          <Pressable onPress={toggleMode} style={styles.linkButton}>
             <Text style={styles.linkText}>
               {isLoginMode ? "¿No tienes cuenta? Crear cuenta" : "¿Ya tienes cuenta? Iniciar sesión"}
             </Text>
           </Pressable>
           {isLoginMode ? (
-            <Pressable onPress={handlePasswordReset}>
+            <Pressable onPress={handlePasswordReset} style={styles.linkButton}>
               <Text style={styles.resetText}>¿Olvidaste tu contraseña?</Text>
             </Pressable>
           ) : null}
@@ -94,17 +102,6 @@ const styles = StyleSheet.create({
   brandWrap: {
     alignItems: "center",
     marginBottom: 18,
-  },
-  brandBadge: {
-    width: 64,
-    height: 64,
-    lineHeight: 64,
-    textAlign: "center",
-    borderRadius: 20,
-    backgroundColor: "#286052",
-    color: "#fffdf8",
-    fontSize: 24,
-    fontWeight: "800",
   },
   appIcon: {
     width: 64,
@@ -137,7 +134,6 @@ const styles = StyleSheet.create({
     borderColor: "#d5dfd8",
     borderRadius: 18,
     padding: 18,
-    boxShadow: "0 10px 16px 0 rgba(36, 68, 56, 0.08)",
     elevation: 3,
   },
   errorText: {
@@ -157,7 +153,7 @@ const styles = StyleSheet.create({
   resetText: {
     textAlign: "center",
     color: "#9d4e30",
-    marginTop: 18,
+    marginTop: 14,
     fontWeight: "600",
   },
   input: {
@@ -171,6 +167,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#15231f",
   },
+  passwordInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#c8d8cf",
+    backgroundColor: "#f4f8f5",
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    fontSize: 16,
+    color: "#15231f",
+  },
+  eyeButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  eyeText: {
+    fontSize: 18,
+  },
   primaryButton: {
     backgroundColor: "#286052",
     paddingVertical: 15,
@@ -178,22 +199,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
     marginBottom: 14,
+    minHeight: 48,
+    justifyContent: "center",
   },
   primaryButtonText: {
     color: "#fffdf8",
     fontSize: 16,
     fontWeight: "700",
   },
+  linkButton: {
+    paddingVertical: 8,
+  },
   linkText: {
     textAlign: "center",
     color: "#286052",
     fontWeight: "700",
-  },
-  eyeContainer: {
-    paddingRight: 12,
-  },
-  eyeButton: {
-    padding: 4,
-    color: "#64748b",
   },
 });

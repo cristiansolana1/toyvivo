@@ -5,19 +5,26 @@ import { formatDate, escapeHtml, showErrorBoundary, showSkeleton } from "./utils
 const db = getDbInstance();
 
 let usersCache = [];
+let filteredUsers = [];
+let currentPage = 1;
+const pageSize = 10;
+let currentSearch = "";
+let listenersInitialized = false;
 
 export async function loadUsersTable() {
   const tbody = document.querySelector("#users-tbody");
   const tableContainer = document.querySelector("#view-users .table-container");
   showSkeleton(tbody, 5, "table");
   
+  setupUserSearchAndPagination();
+
   try {
     const snapshot = await getDocs(collection(db, "users"));
     const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
     usersCache = users.filter(u => u.publicProfile || u.profile);
-    
-    renderUsersTable(usersCache);
+    applyUserFilters();
+    renderUsersTable();
     updateUsersBadge(usersCache.length);
   } catch (error) {
     console.error("[ErrorBoundary] loadUsersTable:", error);
@@ -32,15 +39,31 @@ export async function loadUsersTable() {
   }
 }
 
-function renderUsersTable(users) {
+function applyUserFilters() {
+  filteredUsers = usersCache.filter(user => {
+    if (!currentSearch) return true;
+    const profile = user.publicProfile || user.profile || {};
+    const name = (profile.fullName || "").toLowerCase();
+    const email = (user.emailNormalized || user.email || profile.email || "").toLowerCase();
+    const search = currentSearch.toLowerCase();
+    return name.includes(search) || email.includes(search);
+  });
+  currentPage = 1;
+}
+
+function renderUsersTable() {
   const tbody = document.querySelector("#users-tbody");
-  
-  if (users.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="loading-cell">No hay usuarios registrados.</td></tr>';
+  const start = (currentPage - 1) * pageSize;
+  const end = start + pageSize;
+  const pageUsers = filteredUsers.slice(start, end);
+
+  if (pageUsers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="loading-cell">No se encontraron usuarios.</td></tr>';
+    updateUsersPagination(0);
     return;
   }
   
-  tbody.innerHTML = users.map(user => {
+  tbody.innerHTML = pageUsers.map(user => {
     const profile = user.publicProfile || user.profile;
     const name = profile?.fullName || "Sin nombre";
     const email = user.emailNormalized || user.email || profile?.email || "Sin email";
@@ -70,10 +93,70 @@ function renderUsersTable(users) {
   tbody.querySelectorAll(".view-user-btn").forEach(btn => {
     btn.addEventListener("click", (e) => {
       const row = e.target.closest("tr");
-      const user = users.find(u => u.id === row.dataset.userId);
+      const user = filteredUsers.find(u => u.id === row.dataset.userId);
       if (user) openUserModal(user);
     });
   });
+
+  updateUsersPagination(filteredUsers.length);
+}
+
+function updateUsersPagination(total) {
+  const totalPages = Math.ceil(total / pageSize);
+  const pagination = document.querySelector("#users-pagination");
+  const pageInfo = document.querySelector("#users-page-info");
+  const prevBtn = pagination?.querySelector('[data-page="prev"]');
+  const nextBtn = pagination?.querySelector('[data-page="next"]');
+
+  if (!pagination) return;
+
+  if (totalPages > 1) {
+    pagination.hidden = false;
+    pageInfo.textContent = `Página ${currentPage} de ${totalPages}`;
+    if (prevBtn) prevBtn.disabled = currentPage === 1;
+    if (nextBtn) nextBtn.disabled = currentPage === totalPages;
+  } else {
+    pagination.hidden = true;
+  }
+}
+
+function setupUserSearchAndPagination() {
+  if (listenersInitialized) return;
+  listenersInitialized = true;
+
+  const searchInput = document.querySelector("#user-search");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      currentSearch = e.target.value.trim();
+      applyUserFilters();
+      renderUsersTable();
+    });
+  }
+
+  const pagination = document.querySelector("#users-pagination");
+  if (pagination) {
+    const prevBtn = pagination.querySelector('[data-page="prev"]');
+    const nextBtn = pagination.querySelector('[data-page="next"]');
+
+    if (prevBtn) {
+      prevBtn.addEventListener("click", () => {
+        if (currentPage > 1) {
+          currentPage--;
+          renderUsersTable();
+        }
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener("click", () => {
+        const totalPages = Math.ceil(filteredUsers.length / pageSize);
+        if (currentPage < totalPages) {
+          currentPage++;
+          renderUsersTable();
+        }
+      });
+    }
+  }
 }
 
 function updateUsersBadge(count) {

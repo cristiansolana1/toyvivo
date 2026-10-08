@@ -22,7 +22,11 @@ export function HeartbeatButton({
   const buttonDisabled = disabled || sending;
   const isPrimaryAction = overdue && isOnline && !buttonDisabled;
   const headline = sending ? "Enviando..." : overdue ? "Estoy bien" : countdownText;
-  const helperText = sending ? "Sincronizando con tu seguridad." : overdue ? "Pulsa para avisar a tus contactos." : `Próximo aviso disponible en ${countdownText}`;
+  const helperText = sending
+    ? "Sincronizando con tu seguridad."
+    : overdue
+      ? "Pulsa para avisar a tus contactos."
+      : `Próximo aviso disponible en ${countdownText}`;
 
   return (
     <View style={styles.container}>
