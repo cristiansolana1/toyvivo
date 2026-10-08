@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { AppState } from "react-native";
 import { getUnansweredSurvey, submitSurveyResponse } from "../services/surveyService";
+import { loadNotifiedSurveyId, saveNotifiedSurveyId } from "../storage";
+import { requestNotificationPermissions, sendSurveyNotification } from "../services/notificationService";
 import { Survey, UserProfile } from "../types";
 
 interface UseSurveyReturn {
@@ -35,6 +37,15 @@ export function useSurvey(userId: string, userProfile?: UserProfile): UseSurveyR
       setSurveySubmitted(false);
       setSurveyAnswer(null);
       setSurveyMessage(null);
+
+      const notifiedId = await loadNotifiedSurveyId(userId);
+      if (notifiedId !== unansweredSurvey.id) {
+        const granted = await requestNotificationPermissions();
+        if (granted) {
+          await sendSurveyNotification(unansweredSurvey.question, unansweredSurvey.id);
+          await saveNotifiedSurveyId(userId, unansweredSurvey.id);
+        }
+      }
     } catch {
       setSurveyMessage("No se pudo cargar la encuesta.");
     }
