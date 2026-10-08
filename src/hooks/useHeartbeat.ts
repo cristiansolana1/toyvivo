@@ -1,7 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import NetInfo from "@react-native-community/netinfo";
 import { sendHeartbeat, loadLastHeartbeat, syncPendingHeartbeats, getPendingHeartbeats } from "../services/heartbeatService";
-import { scheduleHeartbeatReminder, requestNotificationPermissions, sendHeartbeatAvailableNotification } from "../services/notificationService";
+import {
+  scheduleHeartbeatReminders,
+  requestNotificationPermissions,
+  sendHeartbeatAvailableNotification,
+  registerNotificationResponseListener,
+} from "../services/notificationService";
 import { HeartbeatEntry } from "../types";
 import { isHeartbeatOverdue, formatHeartbeatCountdown, HEARTBEAT_LIMIT_MS } from "../constants";
 
@@ -61,7 +66,7 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
       }
       void requestNotificationPermissions().then((granted) => {
         if (granted) {
-          void scheduleHeartbeatReminder(22);
+          void scheduleHeartbeatReminders(heartbeat.createdAt);
         }
       });
     } catch (error) {
@@ -117,6 +122,14 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
   const prevOverdueRef = useRef<boolean | null>(null);
 
   useEffect(() => {
+    void requestNotificationPermissions().then((granted) => {
+      if (granted && lastHeartbeat !== null) {
+        void scheduleHeartbeatReminders(lastHeartbeat);
+      }
+    });
+  }, [lastHeartbeat]);
+
+  useEffect(() => {
     if (prevOverdueRef.current === false && overdue) {
       void requestNotificationPermissions().then((granted) => {
         if (granted) {
@@ -126,6 +139,13 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
     }
     prevOverdueRef.current = overdue;
   }, [overdue]);
+
+  useEffect(() => {
+    const unsubscribe = registerNotificationResponseListener(() => {
+      void handleHeartbeat();
+    });
+    return unsubscribe;
+  }, [handleHeartbeat]);
 
   return {
     lastHeartbeat,

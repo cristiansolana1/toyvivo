@@ -131,10 +131,31 @@ export type WatchedUserStatus = {
   lastAliveAt: string | null;
 };
 
+export function parseTimestampIso(value: any): string | null {
+  if (!value) return null;
+  try {
+    if (typeof value.toDate === "function") {
+      return value.toDate().toISOString();
+    }
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    if (typeof value === "string") {
+      return value;
+    }
+    if (typeof value === "number") {
+      return new Date(value).toISOString();
+    }
+  } catch (err) {
+    console.warn("Error parsing timestamp:", err);
+  }
+  return null;
+}
+
 export function subscribeToWatchedUsers(
   userIds: string[],
   onUpdate: (user: WatchedUserStatus) => void,
-  onError?: () => void
+  onError?: (error: Error) => void
 ): () => void {
   if (userIds.length === 0) return () => {};
 
@@ -148,10 +169,13 @@ export function subscribeToWatchedUsers(
           uid: docSnap.id,
           fullName: data.fullName ?? "Usuario",
           phone: data.phone ?? "",
-          lastAliveAt: data.lastAliveAt?.toDate?.()?.toISOString?.() ?? null,
+          lastAliveAt: parseTimestampIso(data.lastAliveAt),
         });
       },
-      onError
+      (error) => {
+        console.warn(`Error subscribing to userStatus for ${uid}:`, error);
+        if (onError) onError(error);
+      }
     );
   });
 

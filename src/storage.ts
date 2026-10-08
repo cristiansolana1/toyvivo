@@ -8,6 +8,7 @@ const safeProfileKey = (uid: string) => `profile-${uid}`;
 const safeHeartbeatHistoryKey = (uid: string) => `heartbeats-${uid}`;
 const safeLastHeartbeatKey = (uid: string) => `lastheartbeat-${uid}`;
 const safePendingHeartbeatsKey = (uid: string) => `pendingheartbeats-${uid}`;
+const safeNotifiedSurveyKey = (uid: string) => `notifiedsurvey-${uid}`;
 
 export async function saveUserProfile(uid: string, profile: UserProfile) {
   const key = safeProfileKey(uid);
@@ -77,6 +78,14 @@ export async function removePendingHeartbeat(uid: string, heartbeatId: string): 
   const pending = raw ? (JSON.parse(raw) as HeartbeatEntry[]) : [];
   const filtered = pending.filter((h) => h.id !== heartbeatId);
   await AsyncStorage.setItem(safePendingHeartbeatsKey(uid), JSON.stringify(filtered));
+}
+
+export async function saveNotifiedSurveyId(uid: string, surveyId: string): Promise<void> {
+  await AsyncStorage.setItem(safeNotifiedSurveyKey(uid), surveyId);
+}
+
+export async function loadNotifiedSurveyId(uid: string): Promise<string | null> {
+  return AsyncStorage.getItem(safeNotifiedSurveyKey(uid));
 }
 
 export async function clearUserData(uid: string): Promise<void> {

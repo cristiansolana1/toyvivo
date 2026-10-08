@@ -27,10 +27,22 @@ export function useWatchedUsers(userId: string): UseWatchedUsersReturn {
   useEffect(() => {
     return subscribeToWatchingUserIds(
       userId,
-      setWatchingUserIds,
+      (ids) => {
+        setWatchingUserIds((previous) => {
+          if (
+            previous.length === ids.length &&
+            previous.every((val, index) => val === ids[index])
+          ) {
+            return previous;
+          }
+          return ids;
+        });
+      },
       () => setWatchMessage("No se pudo sincronizar la lista de contactos aprobados.")
     );
   }, [userId]);
+
+  const watchingIdsKey = watchingUserIds.join(",");
 
   useEffect(() => {
     setWatchedUsers((previous) => previous.filter((user) => watchingUserIds.includes(user.uid)));
@@ -43,7 +55,7 @@ export function useWatchedUsers(userId: string): UseWatchedUsersReturn {
       ]),
       () => setWatchMessage("Se revocó el acceso a uno de tus contactos.")
     );
-  }, [watchingUserIds]);
+  }, [watchingIdsKey]);
 
   const addWatchedUser = useCallback(async (dni: string): Promise<boolean> => {
     const normalizedDni = dni.trim().replace(/\D/g, "");

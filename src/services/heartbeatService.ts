@@ -1,5 +1,5 @@
 import { doc, getDoc, serverTimestamp, writeBatch } from "firebase/firestore";
-import { db } from "../firebase";
+import { auth, db } from "../firebase";
 import { HeartbeatEntry } from "../types";
 import { 
   saveHeartbeat as saveLocalHeartbeat, 
@@ -10,6 +10,7 @@ import {
   clearPendingHeartbeats,
   removePendingHeartbeat,
 } from "../storage";
+import { hydrateUserProfile } from "./profileService";
 
 async function persistHeartbeat(uid: string, heartbeat: HeartbeatEntry): Promise<void> {
   const batch = writeBatch(db);
@@ -23,14 +24,16 @@ async function persistHeartbeat(uid: string, heartbeat: HeartbeatEntry): Promise
   });
   batch.set(userRef, { lastAliveAt: serverTimestamp() }, { merge: true });
 
-  const profile = await loadUserProfile(uid);
+  let profile = await loadUserProfile(uid);
+  if (!profile) {
+    profile = await hydrateUserProfile(uid, auth.currentUser?.email);
+  }
+
   const statusData: Record<string, any> = {
     lastAliveAt: serverTimestamp(),
+    fullName: profile?.fullName ?? "Usuario",
+    phone: profile?.phone ?? "",
   };
-  if (profile) {
-    statusData.fullName = profile.fullName;
-    statusData.phone = profile.phone;
-  }
   batch.set(doc(db, "userStatus", uid), statusData, { merge: true });
 
   await batch.commit();
@@ -80,6 +83,18 @@ export async function loadLastHeartbeat(uid: string): Promise<string | null> {
     const userDoc = await getDoc(doc(db, "users", uid));
     if (userDoc.exists()) {
       const data = userDoc.data();
+      const lastAliveAt = data.lastAliveAt;
+      if (lastAliveAt) {
+        const timestamp = typeof lastAliveAt.toDate === "function"
+          ? lastAliveAt.toDate().toISOString()
+          : new Date(lastAliveAt).toISOString();
+        return timestamp;
+      }
+    }
+
+    const statusDoc = await getDoc(doc(db, "userStatus", uid));
+    if (statusDoc.exists()) {
+      const data = statusDoc.data();
       const lastAliveAt = data.lastAliveAt;
       if (lastAliveAt) {
         const timestamp = typeof lastAliveAt.toDate === "function"
