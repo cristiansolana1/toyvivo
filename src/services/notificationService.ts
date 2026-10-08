@@ -23,6 +23,7 @@ export async function setupNotificationChannels(): Promise<void> {
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#16a34a",
       sound: "default",
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     });
 
     await Notifications.setNotificationChannelAsync("heartbeat_urgent", {
@@ -32,6 +33,7 @@ export async function setupNotificationChannels(): Promise<void> {
       vibrationPattern: [0, 500, 250, 500],
       lightColor: "#dc2626",
       sound: "default",
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     });
 
     await Notifications.setNotificationChannelAsync("surveys", {
@@ -41,6 +43,7 @@ export async function setupNotificationChannels(): Promise<void> {
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#3b82f6",
       sound: "default",
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     });
   }
 }
