@@ -1,4 +1,4 @@
-import { doc, updateDoc, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { addDoc, collection, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getDbInstance } from "./firebase.js";
 import { formatDateTimeForInput, escapeHtml } from "./utils.js";
 import { getAdminEmail } from "./auth.js";
@@ -7,21 +7,17 @@ import { initDateTimePicker, updateTriggerDisplay } from "./datetimePicker.js";
 const db = getDbInstance();
 const ADMIN_EMAIL = getAdminEmail();
 
-let editingSurveyId = null;
-
-export function openSurveyModal(survey) {
+export function openSurveyModal() {
   const modal = document.querySelector("#survey-modal");
   const title = document.querySelector("#survey-modal-title");
   const form = document.querySelector("#survey-modal-form");
-  const questionInput = document.querySelector("#survey-modal-question");
   const startInput = document.querySelector("#survey-modal-start");
   const endInput = document.querySelector("#survey-modal-end");
   const targetCountrySelect = document.querySelector("#survey-modal-target-country");
   const targetProvinceSelect = document.querySelector("#survey-modal-target-province");
   const optionsContainer = document.querySelector("#survey-modal-options");
   const message = document.querySelector("#survey-modal-message");
-  const hiddenId = document.querySelector("#survey-modal-id");
-  
+
   form.reset();
   optionsContainer.innerHTML = `
     <label>Respuesta 1<input class="survey-option" type="text" required /></label>
@@ -29,35 +25,11 @@ export function openSurveyModal(survey) {
   `;
   message.textContent = "";
   
+  title.textContent = "Nueva encuesta";
   targetCountrySelect.value = "";
   targetProvinceSelect.value = "";
   targetProvinceSelect.disabled = true;
-  
-  if (survey) {
-    editingSurveyId = survey.id;
-    title.textContent = "Editar encuesta";
-    hiddenId.value = survey.id;
-    questionInput.value = survey.question;
-    startInput.value = survey.startAt ? formatDateTimeForInput(survey.startAt) : "";
-    endInput.value = survey.endAt ? formatDateTimeForInput(survey.endAt) : "";
-    
-    if (survey.targetCountry) {
-      targetCountrySelect.value = survey.targetCountry;
-      targetProvinceSelect.disabled = false;
-      if (survey.targetProvince) {
-        targetProvinceSelect.value = survey.targetProvince;
-      }
-    }
-    
-    optionsContainer.innerHTML = survey.options.map((opt, i) => 
-      `<label>Respuesta ${i + 1}<input class="survey-option" type="text" required value="${escapeHtml(opt)}" /></label>`
-    ).join("");
-  } else {
-    editingSurveyId = null;
-    title.textContent = "Nueva encuesta";
-    hiddenId.value = "";
-  }
-  
+
   updateTriggerDisplay(startInput);
   updateTriggerDisplay(endInput);
   
@@ -75,14 +47,51 @@ export function openSurveyModal(survey) {
       provinceSelect.disabled = true;
       provinceSelect.value = "";
     }
+    void updateReachIndicator();
   });
-  
+
+  const provinceSelect = document.querySelector("#survey-modal-target-province");
+  const newProvinceSelect = provinceSelect.cloneNode(true);
+  provinceSelect.parentNode.replaceChild(newProvinceSelect, provinceSelect);
+  newProvinceSelect.addEventListener("change", () => {
+    void updateReachIndicator();
+  });
+
+  void updateReachIndicator();
+
   modal.hidden = false;
   document.body.style.overflow = "hidden";
 }
 
+async function updateReachIndicator() {
+  const reachEl = document.querySelector("#survey-modal-reach");
+  if (!reachEl) return;
+  reachEl.textContent = "🎯 Alcance estimado: Calculando...";
+  try {
+    const country = document.querySelector("#survey-modal-target-country")?.value;
+    const province = document.querySelector("#survey-modal-target-province")?.value;
+    const usersSnap = await getDocs(collection(db, "users"));
+    const totalUsers = usersSnap.docs.filter(d => d.data().publicProfile || d.data().profile).length;
+
+    let matched = totalUsers;
+    if (country) {
+      matched = usersSnap.docs.filter(d => {
+        const p = d.data().publicProfile || d.data().profile;
+        if (!p) return false;
+        if (province && p.province !== province) return false;
+        return true;
+      }).length;
+    }
+
+    const pct = totalUsers > 0 ? ((matched / totalUsers) * 100).toFixed(1) : 0;
+    reachEl.textContent = `🎯 Alcance estimado: ${matched} usuarios (${pct}% del total de ${totalUsers})`;
+  } catch (err) {
+    console.warn("Error calculating reach:", err);
+    reachEl.textContent = "🎯 Alcance estimado: No disponible";
+  }
+}
+
 export function closeSurveyModal() {
-  editingSurveyId = null;
   const modal = document.querySelector("#survey-modal");
   const form = document.querySelector("#survey-modal-form");
   form.reset();
@@ -94,7 +103,7 @@ export function closeSurveyModal() {
 
 export function setupSurveyModal() {
   document.querySelector("#new-survey-btn").addEventListener("click", () => {
-    openSurveyModal(null);
+    openSurveyModal();
   });
 
   document.querySelector("#survey-modal-add-option").addEventListener("click", () => {
@@ -143,26 +152,18 @@ export function setupSurveyModal() {
       options,
       active: false,
       createdBy: ADMIN_EMAIL,
+      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
-    
-    if (!editingSurveyId) {
-      surveyData.createdAt = serverTimestamp();
-    }
-    
+
     if (startValue) surveyData.startAt = new Date(startValue);
     if (endValue) surveyData.endAt = new Date(endValue);
     if (targetCountry) surveyData.targetCountry = targetCountry;
     if (targetProvince) surveyData.targetProvince = targetProvince;
     
     try {
-      if (editingSurveyId) {
-        await updateDoc(doc(db, "surveys", editingSurveyId), surveyData);
-        message.textContent = "Encuesta actualizada correctamente.";
-      } else {
-        await addDoc(collection(db, "surveys"), surveyData);
-        message.textContent = "Encuesta creada correctamente.";
-      }
+      await addDoc(collection(db, "surveys"), surveyData);
+      message.textContent = "Encuesta creada correctamente.";
       
       await window.loadSurveysTable?.();
       await window.loadSurveyResults?.();

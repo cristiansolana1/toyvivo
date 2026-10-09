@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, getCountFromServer } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getDbInstance } from "./firebase.js";
 import { formatDate, formatDateTime, escapeHtml, getSurveyStatus, getTargetingDisplay, showSkeleton } from "../modules/utils.js";
 import { openResultsModal } from "../modules/results.js";
@@ -13,15 +13,19 @@ export async function loadResultsView() {
     const snapshot = await getDocs(collection(db, "surveys"));
     const surveys = await Promise.all(snapshot.docs.map(async (surveyDoc) => {
       const data = surveyDoc.data();
-      const responsesSnapshot = await getDocs(collection(db, "surveys", surveyDoc.id, "responses"));
+      const countSnapshot = await getCountFromServer(collection(db, "surveys", surveyDoc.id, "responses"));
+      const totalResponses = countSnapshot.data().count;
       const counts = new Map((Array.isArray(data.options) ? data.options : []).map((option) => [option, 0]));
       
-      responsesSnapshot.docs.forEach((responseDoc) => {
-        const answer = responseDoc.data().answer;
-        if (counts.has(answer)) {
-          counts.set(answer, counts.get(answer) + 1);
-        }
-      });
+      if (totalResponses > 0) {
+        const responsesSnapshot = await getDocs(collection(db, "surveys", surveyDoc.id, "responses"));
+        responsesSnapshot.docs.forEach((responseDoc) => {
+          const answer = responseDoc.data().answer;
+          if (counts.has(answer)) {
+            counts.set(answer, counts.get(answer) + 1);
+          }
+        });
+      }
       
       return {
         id: surveyDoc.id,
@@ -31,7 +35,7 @@ export async function loadResultsView() {
         startAt: data.startAt,
         endAt: data.endAt,
         createdAt: data.createdAt,
-        totalResponses: responsesSnapshot.size,
+        totalResponses,
         counts: [...counts.entries()],
         targetCountry: data.targetCountry,
         targetProvince: data.targetProvince,
@@ -45,11 +49,8 @@ export async function loadResultsView() {
       return;
     }
     
-    const usersSnapshot = await getDocs(collection(db, "users"));
-    const eligibleUsers = usersSnapshot.docs.filter(doc => {
-      const data = doc.data();
-      return data.publicProfile || data.profile;
-    }).length;
+    const usersCountSnapshot = await getCountFromServer(collection(db, "users"));
+    const eligibleUsers = usersCountSnapshot.data().count;
     
     container.innerHTML = surveys.map(survey => {
       const status = getSurveyStatus(survey);

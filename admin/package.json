@@ -2,7 +2,11 @@
   "name": "estoy-bien-admin",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "start": "npx --yes serve@14.2.5 . --listen 3000"
+    "dev": "vite --port 3000",
+    "build": "vite build",
+    "preview": "vite preview --port 3000",
+    "start": "vite preview --port 3000"
   }
 }

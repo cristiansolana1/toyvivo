@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { collection, getDocs, doc, updateDoc, query, orderBy, getCountFromServer } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getDbInstance } from "./firebase.js";
 import { formatDate, formatDateTime, escapeHtml, getSurveyStatus, showSkeleton, showErrorBoundary } from "./utils.js";
 
@@ -12,15 +12,19 @@ export async function loadSurveyResults() {
     const snapshot = await getDocs(collection(db, "surveys"));
     const surveys = await Promise.all(snapshot.docs.map(async (surveyDoc) => {
       const data = surveyDoc.data();
-      const responsesSnapshot = await getDocs(collection(db, "surveys", surveyDoc.id, "responses"));
+      const countSnapshot = await getCountFromServer(collection(db, "surveys", surveyDoc.id, "responses"));
+      const totalResponses = countSnapshot.data().count;
       const counts = new Map((Array.isArray(data.options) ? data.options : []).map((option) => [option, 0]));
 
-      responsesSnapshot.docs.forEach((responseDoc) => {
-        const answer = responseDoc.data().answer;
-        if (counts.has(answer)) {
-          counts.set(answer, counts.get(answer) + 1);
-        }
-      });
+      if (totalResponses > 0) {
+        const responsesSnapshot = await getDocs(collection(db, "surveys", surveyDoc.id, "responses"));
+        responsesSnapshot.docs.forEach((responseDoc) => {
+          const answer = responseDoc.data().answer;
+          if (counts.has(answer)) {
+            counts.set(answer, counts.get(answer) + 1);
+          }
+        });
+      }
 
       return {
         id: surveyDoc.id,
@@ -30,7 +34,7 @@ export async function loadSurveyResults() {
         startAt: data.startAt,
         endAt: data.endAt,
         createdAt: data.createdAt,
-        totalResponses: responsesSnapshot.size,
+        totalResponses,
         counts: [...counts.entries()],
       };
     }));

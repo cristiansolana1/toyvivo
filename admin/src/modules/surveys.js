@@ -1,6 +1,6 @@
 import { 
   collection, getDocs, doc, updateDoc, deleteDoc, addDoc, 
-  query, orderBy, writeBatch, serverTimestamp 
+  query, orderBy, writeBatch, serverTimestamp, getCountFromServer
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getDbInstance } from "./firebase.js";
 import { loadSurveyResults } from "./surveyResults.js";
@@ -29,15 +29,7 @@ export async function loadSurveysTable() {
     const snapshot = await getDocs(collection(db, "surveys"));
     allSurveys = await Promise.all(snapshot.docs.map(async (surveyDoc) => {
       const data = surveyDoc.data();
-      const responsesSnapshot = await getDocs(collection(db, "surveys", surveyDoc.id, "responses"));
-      const counts = new Map((Array.isArray(data.options) ? data.options : []).map((option) => [option, 0]));
-      
-      responsesSnapshot.docs.forEach((responseDoc) => {
-        const answer = responseDoc.data().answer;
-        if (counts.has(answer)) {
-          counts.set(answer, counts.get(answer) + 1);
-        }
-      });
+      const countSnapshot = await getCountFromServer(collection(db, "surveys", surveyDoc.id, "responses"));
       
       return {
         id: surveyDoc.id,
@@ -50,8 +42,7 @@ export async function loadSurveysTable() {
         createdBy: data.createdBy,
         targetCountry: data.targetCountry,
         targetProvince: data.targetProvince,
-        totalResponses: responsesSnapshot.size,
-        counts: [...counts.entries()],
+        totalResponses: countSnapshot.data().count,
       };
     }));
     
@@ -144,7 +135,6 @@ function renderSurveysTable() {
         <td>
           <div class="action-btns">
             <button class="action-btn secondary-btn view-results-btn" title="Ver resultados">📊</button>
-            <button class="action-btn secondary-btn edit-survey-btn" title="Editar">✏️</button>
             <button class="action-btn danger-btn delete-survey-btn" title="Eliminar">🗑️</button>
           </div>
         </td>
@@ -159,14 +149,6 @@ function renderSurveysTable() {
       const row = e.target.closest("tr");
       const survey = filteredSurveys.find(s => s.id === row.dataset.surveyId);
       if (survey) openResultsModal(survey);
-    });
-  });
-  
-  tbody.querySelectorAll(".edit-survey-btn").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      const row = e.target.closest("tr");
-      const survey = filteredSurveys.find(s => s.id === row.dataset.surveyId);
-      if (survey) openSurveyModal(survey);
     });
   });
   
@@ -196,33 +178,38 @@ function updatePagination(total) {
   }
 }
 
+let filtersInitialized = false;
+
 export function setupSurveyFilters() {
-  document.querySelector("#survey-status-filter").addEventListener("change", (e) => {
+  if (filtersInitialized) return;
+  filtersInitialized = true;
+
+  document.querySelector("#survey-status-filter")?.addEventListener("change", (e) => {
     currentStatusFilter = e.target.value;
     applyFiltersAndSort();
     renderSurveysTable();
   });
   
-  document.querySelector("#survey-search").addEventListener("input", (e) => {
+  document.querySelector("#survey-search")?.addEventListener("input", (e) => {
     currentSearch = e.target.value.trim();
     applyFiltersAndSort();
     renderSurveysTable();
   });
   
-  document.querySelector("#survey-sort").addEventListener("change", (e) => {
+  document.querySelector("#survey-sort")?.addEventListener("change", (e) => {
     currentSort = e.target.value;
     applyFiltersAndSort();
     renderSurveysTable();
   });
   
-  document.querySelector("#surveys-pagination").querySelector('[data-page="prev"]').addEventListener("click", () => {
+  document.querySelector("#surveys-pagination")?.querySelector('[data-page="prev"]')?.addEventListener("click", () => {
     if (currentPage > 1) {
       currentPage--;
       renderSurveysTable();
     }
   });
   
-  document.querySelector("#surveys-pagination").querySelector('[data-page="next"]').addEventListener("click", () => {
+  document.querySelector("#surveys-pagination")?.querySelector('[data-page="next"]')?.addEventListener("click", () => {
     const totalPages = Math.ceil(filteredSurveys.length / pageSize);
     if (currentPage < totalPages) {
       currentPage++;

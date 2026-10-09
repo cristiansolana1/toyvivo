@@ -1,6 +1,6 @@
-import { collection, getDocs, doc, getDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, query, orderBy, getCountFromServer } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getDbInstance } from "./firebase.js";
-import { formatDate, formatDateTime, escapeHtml, getSurveyStatus, showSkeleton } from "./utils.js";
+import { formatDate, formatDateTime, escapeHtml, getSurveyStatus, showSkeleton, getProvinceLabel } from "./utils.js";
 
 let currentResultsSurvey = null;
 
@@ -9,16 +9,23 @@ function getDb() {
 }
 
 export async function openResultsModal(survey) {
+  const db = getDb();
   currentResultsSurvey = survey;
   const modal = document.querySelector("#results-modal");
   const title = document.querySelector("#results-modal-title");
   const content = document.querySelector("#results-modal-content");
-  const exportBtn = document.querySelector("#export-csv-btn");
+  const exportCsvBtn = document.querySelector("#export-csv-btn");
+  const exportPdfBtn = document.querySelector("#export-pdf-btn");
   
   title.textContent = `Resultados: ${survey.question}`;
-  exportBtn.disabled = false;
-  exportBtn.dataset.surveyId = survey.id;
-  exportBtn.dataset.surveyQuestion = survey.question;
+  exportCsvBtn.disabled = false;
+  exportCsvBtn.dataset.surveyId = survey.id;
+  exportCsvBtn.dataset.surveyQuestion = survey.question;
+
+  if (exportPdfBtn) {
+    exportPdfBtn.disabled = false;
+    exportPdfBtn.onclick = () => window.print();
+  }
   
   showSkeleton(content, 3, "card");
   modal.hidden = false;
@@ -44,17 +51,34 @@ export async function openResultsModal(survey) {
       const ans = r.data().answer;
       if (counts.has(ans)) counts.set(ans, counts.get(ans) + 1);
     });
+
+    // Fetch user profiles to get province/country data for respondents
+    const userDocs = await Promise.all(responses.map(r => getDoc(doc(db, "users", r.id))));
+    const userProvinceMap = new Map();
+    const provinceCounts = new Map();
+
+    userDocs.forEach((uDoc, idx) => {
+      let prov = "Sin provincia";
+      if (uDoc.exists()) {
+        const uData = uDoc.data();
+        const profile = uData.publicProfile || uData.profile || {};
+        if (profile.province) {
+          prov = getProvinceLabel(profile.province);
+        }
+      }
+      userProvinceMap.set(responses[idx].id, prov);
+      provinceCounts.set(prov, (provinceCounts.get(prov) || 0) + 1);
+    });
     
-    const usersSnapshot = await getDocs(collection(db, "users"));
-    const eligibleUsers = usersSnapshot.docs.filter(doc => {
-      const data = doc.data();
-      return data.publicProfile || data.profile;
-    }).length;
+    const usersCountSnapshot = await getCountFromServer(collection(db, "users"));
+    const eligibleUsers = usersCountSnapshot.data().count;
     const responseRate = eligibleUsers > 0 ? ((totalResponses / eligibleUsers) * 100).toFixed(1) : 0;
     
     const timeSeriesContainer = document.createElement("div");
     timeSeriesContainer.dataset.surveyId = survey.id;
     
+    const targetingText = survey.targetCountry ? (survey.targetCountry + (survey.targetProvince ? ` / ${getProvinceLabel(survey.targetProvince)}` : "")) : "Todo el país";
+
     content.innerHTML = `
       <div class="results-summary">
         <div class="results-summary-item">
@@ -62,12 +86,12 @@ export async function openResultsModal(survey) {
           <span class="results-summary-value">${totalResponses}</span>
         </div>
         <div class="results-summary-item">
-          <span class="results-summary-label">Usuarios elegibles</span>
-          <span class="results-summary-value">${eligibleUsers}</span>
+          <span class="results-summary-label">Participación</span>
+          <span class="results-summary-value">${responseRate}%</span>
         </div>
         <div class="results-summary-item">
-          <span class="results-summary-label">Tasa de participación</span>
-          <span class="results-summary-value">${responseRate}%</span>
+          <span class="results-summary-label">Segmento Destino</span>
+          <span class="results-summary-value" style="font-size: 15px; font-weight: 600;">${escapeHtml(targetingText)}</span>
         </div>
         <div class="results-summary-item">
           <span class="results-summary-label">Estado</span>
@@ -77,13 +101,24 @@ export async function openResultsModal(survey) {
         </div>
       </div>
       <div class="results-chart" id="results-chart"></div>
+
+      <div class="geo-breakdown-section" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #e8efe9;">
+        <h4 style="margin: 0 0 12px; font-family: 'Space Grotesk', sans-serif;">🗺️ Desglose Geográfico por Provincia</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+          ${Array.from(provinceCounts.entries()).map(([prov, count]) => `
+            <div style="padding: 10px 14px; background: #f8faf7; border: 1px solid #e8efe9; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+              <span>${escapeHtml(prov)}</span>
+              <strong>${count}</strong>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
       <div class="timeseries-section" id="timeseries-section"></div>
     `;
     
     const chartContainer = content.querySelector("#results-chart");
-    const countsArray = Array.from(counts.values());
-    const maxCount = countsArray.length > 0 ? Math.max(...countsArray) : 0;
-    
+
     chartContainer.innerHTML = options.map(opt => {
       const count = counts.get(opt) || 0;
       const pct = totalResponses > 0 ? (count / totalResponses) * 100 : 0;
@@ -102,7 +137,7 @@ export async function openResultsModal(survey) {
     renderTimeSeriesChart(timeSeriesContainer, timeSeriesData, options, "day");
     content.querySelector("#timeseries-section").appendChild(timeSeriesContainer);
     
-    exportBtn.onclick = () => exportSurveyCSV(survey, responses, options, counts);
+    exportCsvBtn.onclick = () => exportSurveyCSV(survey, responses, options, counts, userProvinceMap);
     
     if (totalResponses === 0) {
       chartContainer.innerHTML = '<p class="message">Esta encuesta aún no tiene respuestas.</p>';
@@ -128,6 +163,7 @@ export function setupResultsModal() {
 }
 
 async function loadSurveyTimeSeries(surveyId, granularity = "day") {
+  const db = getDb();
   let responsesSnapshot;
   try {
     responsesSnapshot = await getDocs(
@@ -249,13 +285,15 @@ function formatChartDate(date) {
   return date.toLocaleDateString("es-ES", { month: "short", day: "numeric" });
 }
 
-async function exportSurveyCSV(survey, responses, options, counts) {
-  const headers = ["Fecha respuesta", "Usuario ID", "Respuesta"];
+async function exportSurveyCSV(survey, responses, options, counts, userProvinceMap) {
+  const headers = ["Fecha respuesta", "Usuario ID", "Provincia", "Respuesta"];
   const rows = responses.map(r => {
     const data = r.data();
+    const prov = userProvinceMap?.get(r.id) || "Sin provincia";
     return [
       data.answeredAt ? new Date(data.answeredAt).toLocaleString("es-ES") : "",
       r.id,
+      prov,
       data.answer || ""
     ];
   });

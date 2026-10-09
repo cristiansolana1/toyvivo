@@ -3,7 +3,8 @@ import {
   signInWithEmailAndPassword, 
   signOut 
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-import { getAuthInstance } from "./firebase.js";
+import { doc, getDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { getAuthInstance, getDbInstance } from "./firebase.js";
 
 const ADMIN_EMAIL = "cristiansolana1@gmail.com";
 
@@ -25,16 +26,44 @@ function authMessage(error) {
   }
 }
 
+export async function verifyAdminRole(user) {
+  if (!user) return { isAdmin: false, error: "No hay usuario autenticado." };
+
+  const token = await user.getIdTokenResult(true);
+  const isEmailVerified = token.claims.email_verified === true;
+  const isSuperAdmin = user.email?.toLowerCase() === ADMIN_EMAIL && isEmailVerified;
+  const hasCustomClaim = token.claims.admin === true && isEmailVerified;
+
+  if (isSuperAdmin || hasCustomClaim) {
+    return { isAdmin: true, role: isSuperAdmin ? "superadmin" : "admin" };
+  }
+
+  // Check Firestore `admins/{uid}` collection as third authorization tier
+  try {
+    const db = getDbInstance();
+    const adminDoc = await getDoc(doc(db, "admins", user.uid));
+    if (adminDoc.exists() && isEmailVerified) {
+      return { isAdmin: true, role: adminDoc.data().role || "admin" };
+    }
+  } catch (err) {
+    console.warn("[Auth] Error verifying admins collection:", err);
+  }
+
+  if (!isEmailVerified) {
+    return { isAdmin: false, error: "Verifica el correo de la cuenta administradora antes de entrar." };
+  }
+
+  return { isAdmin: false, error: "Esta cuenta no tiene acceso al panel de administración." };
+}
+
 export async function signInAdmin(email, password) {
   const auth = getAuthInstance();
   const credential = await signInWithEmailAndPassword(auth, email, password);
-  const token = await credential.user.getIdTokenResult();
+  const verification = await verifyAdminRole(credential.user);
 
-  if (credential.user.email?.toLowerCase() !== ADMIN_EMAIL || token.claims.email_verified !== true) {
+  if (!verification.isAdmin) {
     await signOut(auth);
-    throw new Error(credential.user.email?.toLowerCase() !== ADMIN_EMAIL
-      ? "Esta cuenta no tiene acceso al panel."
-      : "Verifica el correo de la cuenta administradora antes de entrar.");
+    throw new Error(verification.error);
   }
   
   return credential.user;
@@ -49,14 +78,10 @@ export function onAuthStateChange(callback) {
   const auth = getAuthInstance();
   return onAuthStateChanged(auth, async (user) => {
     if (user) {
-      const token = await user.getIdTokenResult();
-      const isAdmin = user.email?.toLowerCase() === ADMIN_EMAIL;
-      const isVerified = token.claims.email_verified === true;
-      if (!isAdmin || !isVerified) {
+      const verification = await verifyAdminRole(user);
+      if (!verification.isAdmin) {
         await signOut(auth);
-        callback(null, isAdmin
-          ? "Verifica el correo de la cuenta administradora antes de entrar."
-          : "Esta cuenta no tiene acceso al panel.");
+        callback(null, verification.error);
         return;
       }
     }

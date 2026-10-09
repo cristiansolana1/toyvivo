@@ -96,14 +96,14 @@ function renderGeoHeatmap(container, provinceCounts) {
     <div class="geo-heatmap-summary">
       <div class="geo-summary-item">
         <span class="geo-summary-value">${totalUsers}</span>
-        <span class="geo-summary-label">Total usuarios</span>
+        <span class="geo-summary-label">Total usuarios registrados</span>
       </div>
       <div class="geo-summary-item">
         <span class="geo-summary-value">${provincesWithData}</span>
-        <span class="geo-summary-label">Provincias con usuarios</span>
+        <span class="geo-summary-label">Provincias representadas</span>
       </div>
       <div class="geo-summary-item">
-        <span class="geo-summary-value">${totalUsers > 0 ? Math.round(totalUsers / provincesWithData) : 0}</span>
+        <span class="geo-summary-value">${totalUsers > 0 ? (totalUsers / Math.max(1, provincesWithData)).toFixed(1) : 0}</span>
         <span class="geo-summary-label">Promedio por provincia</span>
       </div>
     </div>
@@ -111,10 +111,11 @@ function renderGeoHeatmap(container, provinceCounts) {
     <div class="geo-heatmap-grid">
       ${sortedProvinces.map(province => {
         const color = getColorForCount(province.count);
+        const pct = totalUsers > 0 ? ((province.count / totalUsers) * 100).toFixed(1) : "0.0";
         return `
-          <div class="geo-province-card" style="--province-color: ${color};" title="${province.label}: ${province.count} usuario${province.count !== 1 ? 's' : ''}">
+          <div class="geo-province-card" style="--province-color: ${color};" title="${province.label}: ${province.count} usuario${province.count !== 1 ? 's' : ''} (${pct}%)">
             <div class="geo-province-name">${province.label}</div>
-            <div class="geo-province-count">${province.count}</div>
+            <div class="geo-province-count">${province.count} <small style="font-size: 13px; color: #6e8279; font-weight: normal;">(${pct}%)</small></div>
             <div class="geo-province-bar" style="background: ${color}; width: ${Math.min((province.count / Math.max(1, ...Object.values(provinceCounts))) * 100, 100)}%"></div>
           </div>
         `;

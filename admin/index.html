@@ -79,6 +79,13 @@
                 <p class="metric-label">Último aviso</p>
                 <p id="latest-user" class="metric-detail">Cargando último aviso...</p>
               </article>
+              <article class="metric-card warning-card">
+                <p class="metric-label">Sin aviso (&gt; 48h / Crítico)</p>
+                <p id="critical-count" class="metric-value error">-</p>
+                <p class="metric-detail">Usuarios en umbral de alerta o inactividad prolongada</p>
+                <p class="metric-label">Inactivos (&gt; 24h)</p>
+                <p id="inactive-24h-count" class="metric-detail">Cargando usuarios inactivos...</p>
+              </article>
             </section>
 
             <section class="geo-heatmap-section" aria-labelledby="geo-heatmap-heading">
@@ -134,6 +141,14 @@
                 <p class="section-intro">Administra los usuarios registrados en la aplicación.</p>
               </div>
               <div class="view-header-actions">
+                <select id="user-status-filter" class="filter-select" aria-label="Filtrar usuarios por estado">
+                  <option value="">Todos los usuarios</option>
+                  <option value="complete">Perfil completo</option>
+                  <option value="pending">Perfil pendiente</option>
+                  <option value="recent">Activo (&lt; 24h)</option>
+                  <option value="inactive">Inactivo (&gt; 24h)</option>
+                  <option value="critical">Crítico (&gt; 48h)</option>
+                </select>
                 <input type="search" id="user-search" class="search-input" placeholder="Buscar por nombre o email..." aria-label="Buscar usuarios" />
               </div>
             </div>
@@ -320,6 +335,7 @@
                 <option value="TM">Tucumán</option>
               </select>
             </label>
+            <div id="survey-modal-reach" class="reach-indicator" style="grid-column: span 2; margin-top: 6px; font-weight: 600; color: #286052; font-size: 13px;">🎯 Alcance estimado: Cargando alcance...</div>
           </div>
           <div id="survey-modal-options" class="survey-options">
             <label>Respuesta 1<input class="survey-option" type="text" required /></label>

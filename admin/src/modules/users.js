@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, getDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc, query, orderBy, limit, getCountFromServer } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getDbInstance } from "./firebase.js";
 import { formatDate, escapeHtml, showErrorBoundary, showSkeleton } from "./utils.js";
 
@@ -9,6 +9,7 @@ let filteredUsers = [];
 let currentPage = 1;
 const pageSize = 10;
 let currentSearch = "";
+let currentStatusFilter = "";
 let listenersInitialized = false;
 
 export async function loadUsersTable() {
@@ -19,13 +20,19 @@ export async function loadUsersTable() {
   setupUserSearchAndPagination();
 
   try {
-    const snapshot = await getDocs(collection(db, "users"));
+    // Fast total user count using Firestore aggregation
+    const countSnapshot = await getCountFromServer(collection(db, "users"));
+    const totalCount = countSnapshot.data().count;
+    updateUsersBadge(totalCount);
+
+    // Fetch users with query limit to prevent loading entire database at once
+    const usersQuery = query(collection(db, "users"), limit(100));
+    const snapshot = await getDocs(usersQuery);
     const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
     usersCache = users.filter(u => u.publicProfile || u.profile);
     applyUserFilters();
     renderUsersTable();
-    updateUsersBadge(usersCache.length);
   } catch (error) {
     console.error("[ErrorBoundary] loadUsersTable:", error);
     showErrorBoundary(tableContainer || tbody, error, `
@@ -41,10 +48,29 @@ export async function loadUsersTable() {
 
 function applyUserFilters() {
   filteredUsers = usersCache.filter(user => {
+    const profile = user.publicProfile || user.profile;
+    const hasProfile = Boolean(profile);
+
+    if (currentStatusFilter === "complete" && !hasProfile) return false;
+    if (currentStatusFilter === "pending" && hasProfile) return false;
+
+    if (currentStatusFilter === "recent") {
+      const lastAliveMs = user.lastAliveAt ? (user.lastAliveAt.toMillis ? user.lastAliveAt.toMillis() : new Date(user.lastAliveAt).getTime()) : 0;
+      const hoursDiff = (Date.now() - lastAliveMs) / (1000 * 60 * 60);
+      if (lastAliveMs === 0 || hoursDiff > 24) return false;
+    } else if (currentStatusFilter === "inactive") {
+      const lastAliveMs = user.lastAliveAt ? (user.lastAliveAt.toMillis ? user.lastAliveAt.toMillis() : new Date(user.lastAliveAt).getTime()) : 0;
+      const hoursDiff = (Date.now() - lastAliveMs) / (1000 * 60 * 60);
+      if (lastAliveMs === 0 || hoursDiff <= 24 || hoursDiff > 48) return false;
+    } else if (currentStatusFilter === "critical") {
+      const lastAliveMs = user.lastAliveAt ? (user.lastAliveAt.toMillis ? user.lastAliveAt.toMillis() : new Date(user.lastAliveAt).getTime()) : 0;
+      const hoursDiff = (Date.now() - lastAliveMs) / (1000 * 60 * 60);
+      if (lastAliveMs > 0 && hoursDiff <= 48) return false;
+    }
+
     if (!currentSearch) return true;
-    const profile = user.publicProfile || user.profile || {};
-    const name = (profile.fullName || "").toLowerCase();
-    const email = (user.emailNormalized || user.email || profile.email || "").toLowerCase();
+    const name = (profile?.fullName || "").toLowerCase();
+    const email = (user.emailNormalized || user.email || profile?.email || "").toLowerCase();
     const search = currentSearch.toLowerCase();
     return name.includes(search) || email.includes(search);
   });
@@ -124,6 +150,15 @@ function setupUserSearchAndPagination() {
   if (listenersInitialized) return;
   listenersInitialized = true;
 
+  const statusSelect = document.querySelector("#user-status-filter");
+  if (statusSelect) {
+    statusSelect.addEventListener("change", (e) => {
+      currentStatusFilter = e.target.value;
+      applyUserFilters();
+      renderUsersTable();
+    });
+  }
+
   const searchInput = document.querySelector("#user-search");
   if (searchInput) {
     searchInput.addEventListener("input", (e) => {
@@ -178,6 +213,10 @@ export async function openUserModal(user) {
   try {
     const surveysSnapshot = await getDocs(collection(db, "surveys"));
     const userResponses = (await Promise.all(surveysSnapshot.docs.map(async (surveyDoc) => {
+      // Check response count first before querying specific user document
+      const countSnapshot = await getCountFromServer(collection(db, "surveys", surveyDoc.id, "responses"));
+      if (countSnapshot.data().count === 0) return null;
+
       const responseDoc = await getDoc(doc(db, "surveys", surveyDoc.id, "responses", user.id));
       if (!responseDoc.exists()) return null;
 
