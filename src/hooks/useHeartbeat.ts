@@ -130,17 +130,6 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
   }, [lastHeartbeat]);
 
   useEffect(() => {
-    if (prevOverdueRef.current === false && overdue) {
-      void requestNotificationPermissions().then((granted) => {
-        if (granted) {
-          void sendHeartbeatAvailableNotification();
-        }
-      });
-    }
-    prevOverdueRef.current = overdue;
-  }, [overdue]);
-
-  useEffect(() => {
     const unsubscribe = registerNotificationResponseListener(() => {
       void handleHeartbeat();
     });

@@ -91,80 +91,35 @@ export async function scheduleHeartbeatReminders(lastHeartbeat: string | null): 
     await Notifications.cancelAllScheduledNotificationsAsync();
 
     if (!lastHeartbeat) {
-      await sendHeartbeatAvailableNotification();
       return;
     }
 
     const lastTime = new Date(lastHeartbeat).getTime();
     if (isNaN(lastTime)) {
-      await sendHeartbeatAvailableNotification();
       return;
     }
 
     const now = Date.now();
     const elapsedSeconds = (now - lastTime) / 1000;
+    const secondsUntil24Hours = Math.round(24 * 3600 - elapsedSeconds);
 
-    const availableInSeconds = Math.round(22 * 3600 - elapsedSeconds);
-    const urgentInSeconds = Math.round(23.5 * 3600 - elapsedSeconds);
-
-    if (availableInSeconds > 0) {
-      // 1. Programar recordatorio de disponibilidad (a las 22 hs de la última señal)
+    if (secondsUntil24Hours > 0) {
+      // Programar la notificación para que se active ÚNICAMENTE cuando se cumplan las 24 horas exactas
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "Aviso de vida - Estoy Bien 🟢",
-          body: "Recuerda enviar tu aviso diario para que tus contactos sepan que estás bien.",
-          data: { type: "heartbeat_reminder" },
+          title: "¡Botón 'Estoy bien' disponible! 🟢",
+          body: "Han pasado 24 horas desde tu último aviso. Envía tu señal para que tus contactos sepan que estás bien.",
+          data: { type: "heartbeat_available" },
           sound: true,
           channelId: "heartbeat",
           categoryIdentifier: HEARTBEAT_CATEGORY_ID,
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: availableInSeconds,
+          seconds: secondsUntil24Hours,
           repeats: false,
         },
       });
-
-      // 2. Programar alerta de urgencia (a las 23.5 hs de la última señal)
-      if (urgentInSeconds > availableInSeconds) {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: "⚠️ ¡Atención! Tu aviso está por vencer",
-            body: "Faltan pocos minutos para cumplir 24 hs sin aviso. Presiona aquí para avisar a tus contactos.",
-            data: { type: "heartbeat_urgent" },
-            sound: true,
-            channelId: "heartbeat_urgent",
-            categoryIdentifier: HEARTBEAT_CATEGORY_ID,
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-            seconds: urgentInSeconds,
-            repeats: false,
-          },
-        });
-      }
-    } else if (urgentInSeconds > 0) {
-      // Ya pasaron las 22 hs pero aún no venció (entre 22hs y 23.5hs)
-      await sendHeartbeatAvailableNotification();
-
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "⚠️ ¡Atención! Tu aviso está por vencer",
-          body: "Faltan pocos minutos para cumplir 24 hs sin aviso. Presiona aquí para avisar a tus contactos.",
-          data: { type: "heartbeat_urgent" },
-          sound: true,
-          channelId: "heartbeat_urgent",
-          categoryIdentifier: HEARTBEAT_CATEGORY_ID,
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: urgentInSeconds,
-          repeats: false,
-        },
-      });
-    } else {
-      // Ya pasaron más de 23.5 hs
-      await sendHeartbeatAvailableNotification();
     }
   } catch (error) {
     console.warn("Error scheduling notification reminders:", error);
@@ -186,7 +141,7 @@ export async function sendHeartbeatAvailableNotification(): Promise<string | nul
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
         title: "¡Botón 'Estoy bien' disponible! 🟢",
-        body: "Ya puedes enviar tu aviso diario para que tus contactos sepan que estás bien.",
+        body: "Han pasado 24 horas desde tu último aviso. Envía tu señal para que tus contactos sepan que estás bien.",
         data: { type: "heartbeat_available" },
         sound: true,
         channelId: "heartbeat",

@@ -1,7 +1,7 @@
 import React from "react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "../hooks/useToast";
-import { Alert, Linking, RefreshControl, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, RefreshControl, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 import { useWatchedUsers } from "../hooks/useWatchedUsers";
@@ -16,6 +16,7 @@ import { isHeartbeatOverdue, formatHeartbeatCountdown, FIXED_COUNTRY_LABEL, PROV
 import { User } from "firebase/auth";
 import { UserProfile } from "../types";
 import { deleteUserAccount } from "../services/authService";
+import { requestNotificationPermissions } from "../services/notificationService";
 
 export function HomeScreen({
   user,
@@ -78,6 +79,10 @@ export function HomeScreen({
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [watchDni, setWatchDni] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    requestNotificationPermissions();
+  }, []);
   const [entryError, setEntryError] = useState<string | null>(null);
   const { showToast } = useToast();
 
@@ -105,16 +110,7 @@ export function HomeScreen({
     }
   };
 
-  const handleShareApp = async () => {
-    try {
-      await Share.share({
-        message: "Te invito a usar Aviso de vida para compartir avisos y cuidar a tus contactos.",
-        title: "Invitar a Aviso de vida",
-      });
-    } catch {
-      Alert.alert("No disponible", "No se pudo abrir el menú para compartir.");
-    }
-  };
+
 
   const callWatchedUser = useCallback(async (phone: string) => {
     const sanitizedPhone = phone.replace(/[^0-9+]/g, "");
@@ -297,14 +293,6 @@ export function HomeScreen({
       <Pressable style={styles.logoutButton} onPress={() => void onSignOut()}>
         <Text style={styles.linkText}>Cerrar sesión</Text>
       </Pressable>
-      <View style={styles.bottomButtonsRow}>
-        <Pressable style={styles.shareButton} onPress={() => void handleShareApp()}>
-          <Text style={styles.shareButtonText}>📤 Invitar a compartir</Text>
-        </Pressable>
-        <Pressable style={styles.instagramButton} onPress={() => void Linking.openURL("https://www.instagram.com/estoybien.arg")}>
-          <Text style={styles.instagramButtonText}>📷 Seguir en Instagram</Text>
-        </Pressable>
-      </View>
     </ScrollView>
   );
 }
@@ -403,47 +391,7 @@ const styles = StyleSheet.create({
     color: "#9d4e30",
     fontWeight: "700",
   },
-  shareButton: {
-    alignSelf: "center",
-    marginTop: 28,
-    marginBottom: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: "#286052",
-    borderWidth: 1,
-    borderColor: "#1e4b40",
-    minWidth: 150,
-  },
-  shareButtonText: {
-    color: "#fffdf8",
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  bottomButtonsRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
-    marginTop: 24,
-    marginBottom: 12,
-    flexWrap: "wrap",
-  },
-  instagramButton: {
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: "#fffdf8",
-    borderWidth: 1,
-    borderColor: "#d5dfd8",
-    minWidth: 150,
-  },
-  instagramButtonText: {
-    color: "#9d4e30",
-    fontWeight: "700",
-    fontSize: 14,
-    textAlign: "center",
-  },
+
   errorBanner: {
     backgroundColor: "#f8d7da",
     borderRadius: 8,

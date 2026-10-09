@@ -1,8 +1,6 @@
-import { SkeletonLoader } from "./src/components/SkeletonLoader";
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet } from "react-native";
 import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   User,
@@ -16,7 +14,6 @@ import { VerifyEmailScreen } from "./src/screens/VerifyEmailScreen";
 import { ProfileSetupScreen } from "./src/screens/ProfileSetupScreen";
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
-import { clearUserData } from "./src/storage";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -84,7 +81,12 @@ export default function App() {
       <SafeAreaProvider>
         <SafeAreaView style={styles.container}>
           <View style={styles.loaderWrap}>
-            <SkeletonLoader variant="card" width={150} height={100} animated={true} />
+            <Image
+              source={require("./assets/icon.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <ActivityIndicator size="large" color="#286052" style={styles.spinner} />
             <Text style={styles.subtitle}>Cargando aplicación...</Text>
           </View>
         </SafeAreaView>
@@ -115,7 +117,12 @@ export default function App() {
             />
           ) : profileLoading ? (
             <View style={styles.loaderWrap}>
-              <SkeletonLoader variant="card" width={150} height={100} animated={true} />
+              <Image
+                source={require("./assets/icon.png")}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+              <ActivityIndicator size="large" color="#286052" style={styles.spinner} />
               <Text style={styles.subtitle}>Cargando tu perfil...</Text>
             </View>
           ) : !profile ? (
@@ -151,11 +158,22 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  logo: {
+    width: 110,
+    height: 110,
+    borderRadius: 22,
+    marginBottom: 12,
+  },
+  spinner: {
+    marginVertical: 10,
   },
   subtitle: {
     fontSize: 15,
+    fontWeight: "600",
     color: "#334155",
-    marginTop: 12,
+    marginTop: 8,
   },
   errorText: {
     color: "#b91c1c",

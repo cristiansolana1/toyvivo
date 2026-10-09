@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { AppState } from "react-native";
-import { getUnansweredSurvey, submitSurveyResponse } from "../services/surveyService";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase";
+import {
+  getUnansweredSurvey,
+  submitSurveyResponse,
+  subscribeToActiveSurveys,
+  surveyMatchesLocation,
+} from "../services/surveyService";
 import { loadNotifiedSurveyId, saveNotifiedSurveyId } from "../storage";
 import { requestNotificationPermissions, sendSurveyNotification } from "../services/notificationService";
 import { Survey, UserProfile } from "../types";
@@ -35,8 +41,6 @@ export function useSurvey(userId: string, userProfile?: UserProfile): UseSurveyR
       }
       setSurvey(unansweredSurvey);
       setSurveySubmitted(false);
-      setSurveyAnswer(null);
-      setSurveyMessage(null);
 
       const notifiedId = await loadNotifiedSurveyId(userId);
       if (notifiedId !== unansweredSurvey.id) {
@@ -52,18 +56,54 @@ export function useSurvey(userId: string, userProfile?: UserProfile): UseSurveyR
   }, [userId, userCountry, userProvince]);
 
   useEffect(() => {
-    loadSurvey();
+    if (!userId) return;
 
-    const subscription = AppState.addEventListener("change", (nextAppState) => {
-      if (nextAppState === "active") {
-        void loadSurvey();
+    const unsubscribe = subscribeToActiveSurveys(async (activeSurveys) => {
+      try {
+        const matchingSurveys = activeSurveys.filter((item) =>
+          surveyMatchesLocation(item, userCountry, userProvince)
+        );
+
+        const responses = await Promise.all(
+          matchingSurveys.map((candidate) =>
+            getDoc(doc(db, "surveys", candidate.id, "responses", userId))
+          )
+        );
+        const unansweredIndex = responses.findIndex((res) => !res.exists());
+
+        if (unansweredIndex < 0) {
+          setSurvey(null);
+          return;
+        }
+
+        const candidate = matchingSurveys[unansweredIndex];
+        const unansweredSurvey: Survey = {
+          id: candidate.id,
+          question: candidate.question ?? "",
+          options: (candidate.options as unknown[])
+            .filter((opt): opt is string => typeof opt === "string")
+            .slice(0, 4),
+        };
+
+        setSurvey(unansweredSurvey);
+
+        const notifiedId = await loadNotifiedSurveyId(userId);
+        if (notifiedId !== unansweredSurvey.id) {
+          const granted = await requestNotificationPermissions();
+          if (granted) {
+            await sendSurveyNotification(unansweredSurvey.question, unansweredSurvey.id);
+            await saveNotifiedSurveyId(userId, unansweredSurvey.id);
+          }
+        }
+      } catch (err) {
+        console.warn("Error processing real-time survey update:", err);
       }
     });
 
     return () => {
-      subscription.remove();
+      unsubscribe();
     };
-  }, [loadSurvey]);
+  }, [userId, userCountry, userProvince]);
 
   const handleSurveySubmit = useCallback(async () => {
     if (!survey || !surveyAnswer || surveySubmitted) return;

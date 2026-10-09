@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, getDoc, query, runTransaction, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, onSnapshot, query, runTransaction, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { Survey } from "../types";
 
@@ -14,7 +14,7 @@ export interface SurveyWithMeta {
   targetProvince?: string;
 }
 
-function surveyMatchesLocation(survey: SurveyWithMeta, userCountry?: string, userProvince?: string): boolean {
+export function surveyMatchesLocation(survey: SurveyWithMeta, userCountry?: string, userProvince?: string): boolean {
   // If survey has no targeting, it matches all users
   if (!survey.targetCountry && !survey.targetProvince) return true;
   
@@ -28,6 +28,49 @@ function surveyMatchesLocation(survey: SurveyWithMeta, userCountry?: string, use
   if (survey.targetProvince && survey.targetProvince !== userProvince) return false;
   
   return true;
+}
+
+export function subscribeToActiveSurveys(
+  onUpdate: (surveys: SurveyWithMeta[]) => void,
+  onError?: (error: Error) => void
+): () => void {
+  const q = query(collection(db, "surveys"), where("active", "==", true));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const now = Date.now();
+      const surveys = snapshot.docs
+        .map((surveyDoc) => {
+          const data = surveyDoc.data();
+          return {
+            id: surveyDoc.id,
+            active: data.active as boolean | undefined,
+            question: data.question as string | undefined,
+            options: data.options as unknown,
+            createdAt: data.createdAt as { toMillis?: () => number } | undefined,
+            startAt: data.startAt as { toMillis?: () => number } | undefined,
+            endAt: data.endAt as { toMillis?: () => number } | undefined,
+            targetCountry: data.targetCountry as string | undefined,
+            targetProvince: data.targetProvince as string | undefined,
+          };
+        })
+        .filter((item) => {
+          if (item.active === false) return false;
+          if (typeof item.question !== "string") return false;
+          if (!Array.isArray(item.options)) return false;
+          const start = item.startAt?.toMillis?.() ?? 0;
+          const end = item.endAt?.toMillis?.() ?? 0;
+          if (start && now < start) return false;
+          if (end && now > end) return false;
+          return true;
+        })
+        .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+      onUpdate(surveys);
+    },
+    (err) => {
+      if (onError) onError(err);
+    }
+  );
 }
 
 export async function getActiveSurveys(userCountry?: string, userProvince?: string): Promise<SurveyWithMeta[]> {
