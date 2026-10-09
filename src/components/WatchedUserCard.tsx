@@ -120,11 +120,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: 12,
   },
   primaryActions: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: 16,
   },
   callText: {

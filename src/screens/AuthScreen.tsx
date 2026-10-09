@@ -1,4 +1,15 @@
-import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, Pressable, View, Image, TouchableOpacity } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { User } from "firebase/auth";
@@ -37,9 +48,43 @@ export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: User
         <Text style={styles.subtitle}>Accede una sola vez para dejar tu sesión guardada y cuidar a tus contactos.</Text>
 
         <View style={styles.formCard}>
+          {/* Segmented Control Toggle (Login vs Register) */}
+          <View style={styles.tabContainer}>
+            <Pressable
+              style={[styles.tabButton, isLoginMode && styles.activeTabButton]}
+              onPress={() => {
+                if (!isLoginMode) toggleMode();
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isLoginMode }}
+              accessibilityLabel="Iniciar sesión"
+            >
+              <Text style={[styles.tabText, isLoginMode && styles.activeTabText]}>
+                Iniciar sesión
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.tabButton, !isLoginMode && styles.activeTabButton]}
+              onPress={() => {
+                if (isLoginMode) toggleMode();
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: !isLoginMode }}
+              accessibilityLabel="Crear cuenta"
+            >
+              <Text style={[styles.tabText, !isLoginMode && styles.activeTabText]}>
+                Crear cuenta
+              </Text>
+            </Pressable>
+          </View>
+
           <TextInput
             style={styles.input}
             autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            textContentType="emailAddress"
             keyboardType="email-address"
             placeholder="Correo electrónico"
             placeholderTextColor="#64748b"
@@ -52,6 +97,9 @@ export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: User
             <TextInput
               style={styles.passwordInput}
               secureTextEntry={!isPasswordVisible}
+              autoCapitalize="none"
+              autoComplete={isLoginMode ? "password" : "password-new"}
+              textContentType={isLoginMode ? "password" : "newPassword"}
               placeholder="Contraseña"
               placeholderTextColor="#64748b"
               value={password}
@@ -71,16 +119,15 @@ export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: User
           {authNotice ? <Text style={styles.noticeText}>{authNotice}</Text> : null}
 
           <Pressable style={styles.primaryButton} onPress={() => handleSubmit(onAccountCreated)} disabled={submitting}>
-            <Text style={styles.primaryButtonText}>{submitting ? "Procesando..." : buttonLabel}</Text>
+            {submitting ? (
+              <ActivityIndicator size="small" color="#fffdf8" />
+            ) : (
+              <Text style={styles.primaryButtonText}>{buttonLabel}</Text>
+            )}
           </Pressable>
 
-          <Pressable onPress={toggleMode} style={styles.linkButton}>
-            <Text style={styles.linkText}>
-              {isLoginMode ? "¿No tienes cuenta? Crear cuenta" : "¿Ya tienes cuenta? Iniciar sesión"}
-            </Text>
-          </Pressable>
           {isLoginMode ? (
-            <Pressable onPress={handlePasswordReset} style={styles.linkButton}>
+            <Pressable onPress={handlePasswordReset} style={styles.linkButton} accessibilityRole="button">
               <Text style={styles.resetText}>¿Olvidaste tu contraseña?</Text>
             </Pressable>
           ) : null}
@@ -136,6 +183,37 @@ const styles = StyleSheet.create({
     padding: 18,
     elevation: 3,
   },
+  tabContainer: {
+    flexDirection: "row",
+    backgroundColor: "#e7efe9",
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 18,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activeTabButton: {
+    backgroundColor: "#286052",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#587068",
+  },
+  activeTabText: {
+    color: "#fffdf8",
+    fontWeight: "700",
+  },
   errorText: {
     color: "#a83f32",
     textAlign: "center",
@@ -153,7 +231,7 @@ const styles = StyleSheet.create({
   resetText: {
     textAlign: "center",
     color: "#9d4e30",
-    marginTop: 14,
+    marginTop: 8,
     fontWeight: "600",
   },
   input: {
@@ -198,7 +276,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     marginTop: 8,
-    marginBottom: 14,
+    marginBottom: 12,
     minHeight: 48,
     justifyContent: "center",
   },

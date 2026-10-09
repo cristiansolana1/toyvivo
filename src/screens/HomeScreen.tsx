@@ -169,7 +169,7 @@ export function HomeScreen({
       }
       contentContainerStyle={[styles.screen, { paddingBottom: Math.max(insets.bottom + 32, 56) }]}>
       <View style={styles.statusCard}>
-        <View>
+        <View style={{ flex: 1, paddingRight: 8 }}>
           <Text style={styles.statusLabel}>Estado actual</Text>
           <Text style={styles.title}>Hola, {profile?.fullName ?? user?.email?.split("@")[0] ?? "Invitado"}</Text>
         </View>

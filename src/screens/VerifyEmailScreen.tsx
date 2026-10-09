@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { User, sendEmailVerification } from "firebase/auth";
 import { useToast } from "../hooks/useToast";
 
@@ -14,6 +15,7 @@ export function VerifyEmailScreen({ user, onSignOut, onVerified }: VerifyEmailSc
   const [resending, setResending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const { showToast } = useToast();
+  const insets = useSafeAreaInsets();
 
   const handleCheckVerification = async () => {
     try {
@@ -48,37 +50,54 @@ export function VerifyEmailScreen({ user, onSignOut, onVerified }: VerifyEmailSc
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Verifica tu correo electrónico</Text>
-      <Text style={styles.subtitle}>
-        Hemos enviado un enlace de confirmación a <Text style={styles.bold}>{user.email}</Text>.
-        Por favor, abre tu correo y haz clic en el enlace para confirmar tus datos antes de continuar.
-      </Text>
+    <ScrollView
+      style={styles.scrollContainer}
+      contentContainerStyle={[
+        styles.container,
+        { paddingBottom: Math.max(insets.bottom + 32, 48) },
+      ]}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.card}>
+        <Text style={styles.title}>Verifica tu correo electrónico</Text>
+        <Text style={styles.subtitle}>
+          Hemos enviado un enlace de confirmación a <Text style={styles.bold}>{user.email}</Text>.
+          Por favor, abre tu correo y haz clic en el enlace para confirmar tus datos antes de continuar.
+        </Text>
 
-      {message ? <Text style={styles.message}>{message}</Text> : null}
+        {message ? <Text style={styles.message}>{message}</Text> : null}
 
-      <Pressable style={styles.button} onPress={handleCheckVerification} disabled={checking}>
-        <Text style={styles.buttonText}>{checking ? "Comprobando..." : "Ya verifiqué mi correo"}</Text>
-      </Pressable>
+        <Pressable style={styles.button} onPress={handleCheckVerification} disabled={checking}>
+          <Text style={styles.buttonText}>{checking ? "Comprobando..." : "Ya verifiqué mi correo"}</Text>
+        </Pressable>
 
-      <Pressable style={styles.secondaryButton} onPress={handleResend} disabled={resending}>
-        <Text style={styles.secondaryButtonText}>{resending ? "Enviando..." : "Reenviar correo"}</Text>
-      </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={handleResend} disabled={resending}>
+          <Text style={styles.secondaryButtonText}>{resending ? "Enviando..." : "Reenviar correo"}</Text>
+        </Pressable>
 
-      <Pressable style={styles.linkButton} onPress={onSignOut}>
-        <Text style={styles.linkButtonText}>Cerrar sesión</Text>
-      </Pressable>
-    </View>
+        <Pressable style={styles.linkButton} onPress={onSignOut}>
+          <Text style={styles.linkButtonText}>Cerrar sesión</Text>
+        </Pressable>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scrollContainer: {
     flex: 1,
+    backgroundColor: "#f8fafc",
+  },
+  container: {
+    flexGrow: 1,
     padding: 24,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
+  },
+  card: {
+    width: "100%",
+    maxWidth: 420,
+    alignItems: "center",
   },
   title: {
     fontSize: 24,
