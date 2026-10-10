@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, memo } from "react";
 import { useToast } from "../hooks/useToast";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Picker } from "@react-native-picker/picker";
@@ -15,7 +15,7 @@ interface ProfileEditorProps {
   onDelete?: () => Promise<void>;
 }
 
-export function ProfileEditor({ profile, onSave, onCancel, saving, onDelete }: ProfileEditorProps) {
+function ProfileEditorComponent({ profile, onSave, onCancel, saving, onDelete }: ProfileEditorProps) {
   const [phone, setPhone] = useState(profile.phone);
   const [province, setProvince] = useState(profile.province ?? "BA");
   const [localSaving, setLocalSaving] = useState(false);
@@ -124,6 +124,8 @@ export function ProfileEditor({ profile, onSave, onCancel, saving, onDelete }: P
     </View>
   );
 }
+
+export const ProfileEditor = memo(ProfileEditorComponent);
 
 const styles = StyleSheet.create({
   editor: {

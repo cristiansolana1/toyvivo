@@ -1,3 +1,4 @@
+import React, { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Survey } from "../types";
 
@@ -11,7 +12,7 @@ interface SurveyCardProps {
   message: string | null;
 }
 
-export function SurveyCard({ survey, answer, onAnswerSelect, onSubmit, submitting, submitted, message }: SurveyCardProps) {
+function SurveyCardComponent({ survey, answer, onAnswerSelect, onSubmit, submitting, submitted, message }: SurveyCardProps) {
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Encuesta</Text>
@@ -38,6 +39,8 @@ export function SurveyCard({ survey, answer, onAnswerSelect, onSubmit, submittin
     </View>
   );
 }
+
+export const SurveyCard = memo(SurveyCardComponent);
 
 const styles = StyleSheet.create({
   card: {

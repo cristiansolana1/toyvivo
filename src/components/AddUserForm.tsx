@@ -1,3 +1,4 @@
+import React, { memo } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 interface AddUserFormProps {
@@ -8,7 +9,7 @@ interface AddUserFormProps {
   message: string | null;
 }
 
-export function AddUserForm({ value, onChangeText, onSubmit, disabled, message }: AddUserFormProps) {
+function AddUserFormComponent({ value, onChangeText, onSubmit, disabled, message }: AddUserFormProps) {
   return (
     <View>
       <View style={styles.row}>
@@ -29,6 +30,8 @@ export function AddUserForm({ value, onChangeText, onSubmit, disabled, message }
     </View>
   );
 }
+
+export const AddUserForm = memo(AddUserFormComponent);
 
 const styles = StyleSheet.create({
   row: {
