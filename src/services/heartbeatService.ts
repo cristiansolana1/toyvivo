@@ -24,15 +24,25 @@ async function persistHeartbeat(uid: string, heartbeat: HeartbeatEntry): Promise
   });
   batch.set(userRef, { lastAliveAt: serverTimestamp() }, { merge: true });
 
-  let profile = await loadUserProfile(uid);
-  if (!profile) {
-    profile = await hydrateUserProfile(uid, auth.currentUser?.email);
+  let fullName = "Usuario";
+  let phone = "";
+  try {
+    let profile = await loadUserProfile(uid);
+    if (!profile) {
+      profile = await hydrateUserProfile(uid, auth.currentUser?.email);
+    }
+    if (profile) {
+      fullName = profile.fullName ?? "Usuario";
+      phone = profile.phone ?? "";
+    }
+  } catch (profileError) {
+    console.warn("Could not load profile during persistHeartbeat, using defaults:", profileError);
   }
 
   const statusData: Record<string, any> = {
     lastAliveAt: serverTimestamp(),
-    fullName: profile?.fullName ?? "Usuario",
-    phone: profile?.phone ?? "",
+    fullName,
+    phone,
   };
   batch.set(doc(db, "userStatus", uid), statusData, { merge: true });
 
