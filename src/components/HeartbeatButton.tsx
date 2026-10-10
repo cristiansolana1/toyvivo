@@ -1,3 +1,4 @@
+import React, { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 interface HeartbeatButtonProps {
@@ -10,7 +11,7 @@ interface HeartbeatButtonProps {
   isOnline: boolean;
 }
 
-export function HeartbeatButton({
+function HeartbeatButtonComponent({
   onPress,
   disabled,
   sending,
@@ -33,6 +34,7 @@ export function HeartbeatButton({
       <Pressable
         style={[
           styles.button,
+          isPrimaryAction && styles.primaryActionActive,
           !isPrimaryAction && styles.disabled,
           !isOnline && styles.offline,
           buttonDisabled && styles.disabled,
@@ -61,6 +63,8 @@ export function HeartbeatButton({
   );
 }
 
+export const HeartbeatButton = memo(HeartbeatButtonComponent);
+
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
@@ -80,6 +84,14 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 12 },
     elevation: 4,
+  },
+  primaryActionActive: {
+    backgroundColor: "#15803d",
+    shadowOpacity: 0.35,
+    shadowRadius: 22,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: "#86efac",
   },
   disabled: {
     backgroundColor: "#94a3b8",

@@ -102,9 +102,10 @@ function ProfileEditorComponent({ profile, onSave, onCancel, saving, onDelete }:
           selectedValue={province}
           onValueChange={setProvince}
           itemStyle={styles.pickerItem}
+          dropdownIconColor="#0f172a"
         >
           {PROVINCES_AR.map((p) => (
-            <Picker.Item key={p.code} label={p.label} value={p.code} />
+            <Picker.Item key={p.code} label={p.label} value={p.code} color="#0f172a" />
           ))}
         </Picker>
       </View>
@@ -172,6 +173,7 @@ const styles = StyleSheet.create({
     borderColor: "#cbd5e1",
     borderRadius: 10,
     paddingHorizontal: 14,
+    color: "#0f172a",
   },
   pickerItem: {
     fontSize: 16,

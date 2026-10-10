@@ -1,5 +1,7 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "../firebase";
 
 export const HEARTBEAT_CATEGORY_ID = "heartbeat_actions";
 export const ACTION_ESTOY_BIEN_ID = "action_estoy_bien";
@@ -9,9 +11,27 @@ if (Platform.OS !== "web") {
     handleNotification: async () => ({
       shouldShowAlert: true,
       shouldPlaySound: true,
-      shouldSetBadge: false,
+      shouldSetBadge: true,
     }),
   });
+}
+
+export async function setBadgeCountAsync(count: number): Promise<void> {
+  if (Platform.OS === "web") return;
+  try {
+    await Notifications.setBadgeCountAsync(count);
+  } catch (error) {
+    console.warn("Error setting badge count:", error);
+  }
+}
+
+export async function clearBadgeCountAsync(): Promise<void> {
+  if (Platform.OS === "web") return;
+  try {
+    await Notifications.setBadgeCountAsync(0);
+  } catch (error) {
+    console.warn("Error clearing badge count:", error);
+  }
 }
 
 export async function setupNotificationChannels(): Promise<void> {
@@ -65,7 +85,23 @@ export async function setupNotificationCategories(): Promise<void> {
   }
 }
 
-export async function requestNotificationPermissions(): Promise<boolean> {
+export async function registerForPushTokenAsync(userId: string): Promise<string | null> {
+  if (Platform.OS === "web") return null;
+  try {
+    const tokenData = await Notifications.getExpoPushTokenAsync();
+    const token = tokenData.data;
+    if (token) {
+      const userRef = doc(db, "users", userId);
+      await setDoc(userRef, { pushToken: token }, { merge: true });
+      return token;
+    }
+  } catch (error) {
+    console.warn("Error getting push token:", error);
+  }
+  return null;
+}
+
+export async function requestNotificationPermissions(userId?: string): Promise<boolean> {
   if (Platform.OS === "web") return false;
   try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -77,6 +113,9 @@ export async function requestNotificationPermissions(): Promise<boolean> {
     if (finalStatus === "granted") {
       await setupNotificationChannels();
       await setupNotificationCategories();
+      if (userId) {
+        await registerForPushTokenAsync(userId);
+      }
     }
     return finalStatus === "granted";
   } catch (error) {

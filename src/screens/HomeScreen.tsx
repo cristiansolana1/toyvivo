@@ -1,18 +1,17 @@
-import React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useToast } from "../hooks/useToast";
-import { Alert, Linking, RefreshControl, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, RefreshControl, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 import { useWatchedUsers } from "../hooks/useWatchedUsers";
 import { useContactRequests } from "../hooks/useContactRequests";
 import { useSurvey } from "../hooks/useSurvey";
 import { HeartbeatButton } from "../components/HeartbeatButton";
-import { WatchedUserCard } from "../components/WatchedUserCard";
 import { ProfileEditor } from "../components/ProfileEditor";
 import { SurveyCard } from "../components/SurveyCard";
-import { AddUserForm } from "../components/AddUserForm";
-import { isHeartbeatOverdue, formatHeartbeatCountdown, FIXED_COUNTRY_LABEL, PROVINCES_AR } from "../constants";
+import { StatusHeader } from "../components/StatusHeader";
+import { ContactRequestsSection } from "../components/ContactRequestsSection";
+import { WatchedUsersSection } from "../components/WatchedUsersSection";
 import { User } from "firebase/auth";
 import { UserProfile } from "../types";
 import { deleteUserAccount } from "../services/authService";
@@ -55,7 +54,6 @@ export function HomeScreen({
     watchMessage,
     addWatchedUser,
     removeWatchedUser,
-    setWatchMessage,
   } = useWatchedUsers(user.uid);
 
   const {
@@ -81,23 +79,17 @@ export function HomeScreen({
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    requestNotificationPermissions();
-  }, []);
+    if (user?.uid) {
+      requestNotificationPermissions(user.uid);
+    }
+  }, [user?.uid]);
+
   const [entryError, setEntryError] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  // Clear error when starting new operation
   const clearEntryError = useCallback(() => setEntryError(null), []);
 
-  const sortedWatchedUsers = useMemo(() => {
-    return [...watchedUsers].sort((a, b) => {
-      const aMs = a.lastAliveAt ? new Date(a.lastAliveAt).getTime() : 0;
-      const bMs = b.lastAliveAt ? new Date(b.lastAliveAt).getTime() : 0;
-      return bMs - aMs;
-    });
-  }, [watchedUsers]);
-
-  const handleSaveProfile = async (updatedProfile: UserProfile): Promise<boolean> => {
+  const handleSaveProfile = useCallback(async (updatedProfile: UserProfile): Promise<boolean> => {
     try {
       clearEntryError();
       await onSaveProfile(updatedProfile);
@@ -108,9 +100,7 @@ export function HomeScreen({
       setEntryError("Error al guardar: " + (error instanceof Error ? error.message : "Error desconocido"));
       return false;
     }
-  };
-
-
+  }, [clearEntryError, onSaveProfile]);
 
   const callWatchedUser = useCallback(async (phone: string) => {
     const sanitizedPhone = phone.replace(/[^0-9+]/g, "");
@@ -148,77 +138,63 @@ export function HomeScreen({
     }
   }, [showToast]);
 
+  const handleToggleProfileEditor = useCallback(() => {
+    setShowProfileEditor((prev) => !prev);
+  }, []);
+
+  const handleAddWatch = useCallback(async () => {
+    const ok = await addWatchedUser(watchDni);
+    if (ok) setWatchDni("");
+  }, [addWatchedUser, watchDni]);
+
+  const handleSignOut = useCallback(() => {
+    void onSignOut();
+  }, [onSignOut]);
+
   return (
     <ScrollView
+      style={styles.container}
       keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={async () => {
-          setRefreshing(true);
-          try {
-            await Promise.all([
-              syncPending(),
-              loadSurvey(),
-            ]);
-          } finally {
-            setRefreshing(false);
-          }
-        }}
+            setRefreshing(true);
+            try {
+              await Promise.all([
+                syncPending(),
+                loadSurvey(),
+              ]);
+              showToast({ text: "Datos actualizados correctamente.", type: "success" });
+            } catch {
+              showToast({ text: "Error al actualizar los datos.", type: "error" });
+            } finally {
+              setRefreshing(false);
+            }
+          }}
         />
       }
-      contentContainerStyle={[styles.screen, { paddingBottom: Math.max(insets.bottom + 32, 56) }]}>
-      <View style={styles.statusCard}>
-        <View style={{ flex: 1, paddingRight: 8 }}>
-          <Text style={styles.statusLabel}>Estado actual</Text>
-          <Text style={styles.title}>Hola, {profile?.fullName ?? user?.email?.split("@")[0] ?? "Invitado"}</Text>
-        </View>
-        <Pressable style={styles.profileMenuButton} onPress={() => setShowProfileEditor((previous) => !previous)}>
-          <Text style={styles.profileMenuButtonText}>
-            {showProfileEditor ? "Ocultar" : "Editar"}
-          </Text>
-        </Pressable>
-      </View>
+      contentContainerStyle={[styles.contentContainer, { paddingBottom: Math.max(insets.bottom + 32, 56) }]}>
+
+      <StatusHeader
+        fullName={profile?.fullName}
+        email={user?.email}
+        showProfileEditor={showProfileEditor}
+        onToggleProfileEditor={handleToggleProfileEditor}
+      />
+
       {entryError && (
         <View style={styles.errorBanner}>
           <Text style={styles.errorBannerText}>{entryError}</Text>
         </View>
       )}
 
-      {contactRequests.length > 0 ? (
-        <View style={styles.requestCard}>
-          <Text style={styles.requestTitle}>Solicitudes de contacto</Text>
-          <Text style={styles.requestDisclosure}>
-            Al aceptar, compartirás tu nombre, teléfono y último aviso con esa persona. Puedes revocar el acceso quitándola de Seguridad de tus contactos.
-          </Text>
-          {contactRequestError ? <Text style={styles.requestError}>{contactRequestError}</Text> : null}
-          {contactRequests.map((request) => (
-            <View key={request.requesterUid} style={styles.requestRow}>
-              <Text style={styles.requestName}>{request.requesterName}</Text>
-              <View style={styles.requestActions}>
-                <Pressable
-                  style={[styles.requestButton, styles.rejectButton]}
-                  onPress={() => void respondToRequest(request.requesterUid, false)}
-                  disabled={respondingUid === request.requesterUid}
-                  accessibilityLabel={`Rechazar solicitud de ${request.requesterName}`}
-                >
-                  <Text style={styles.rejectButtonText}>Rechazar</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.requestButton, styles.approveButton]}
-                  onPress={() => void respondToRequest(request.requesterUid, true)}
-                  disabled={respondingUid === request.requesterUid}
-                  accessibilityLabel={`Aprobar solicitud de ${request.requesterName}`}
-                >
-                  <Text style={styles.approveButtonText}>Aceptar</Text>
-                </Pressable>
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : contactRequestError ? (
-        <Text style={styles.requestError}>{contactRequestError}</Text>
-      ) : null}
+      <ContactRequestsSection
+        requests={contactRequests}
+        error={contactRequestError}
+        respondingUid={respondingUid}
+        onRespond={respondToRequest}
+      />
 
       {showProfileEditor && currentProfile?.fullName ? (
         <ProfileEditor
@@ -259,38 +235,21 @@ export function HomeScreen({
         isOnline={isOnline}
       />
 
-      <Text style={styles.sectionTitle}>Seguridad de tus contactos</Text>
-      <Text style={styles.counterText}>Contactos activos: {watchingUserIds.length}</Text>
-      <AddUserForm
-        value={watchDni}
-        onChangeText={setWatchDni}
-        onSubmit={async () => {
-          const ok = await addWatchedUser(watchDni);
-          if (ok) setWatchDni("");
-        }}
-        disabled={addingWatch}
-        message={watchMessage}
+      <WatchedUsersSection
+        watchingUserIds={watchingUserIds}
+        watchedUsers={watchedUsers}
+        addingWatch={addingWatch}
+        watchMessage={watchMessage}
+        watchDni={watchDni}
+        onChangeWatchDni={setWatchDni}
+        onAddWatch={handleAddWatch}
+        onCall={callWatchedUser}
+        onWhatsApp={messageWatchedUser}
+        onRemove={removeWatchedUser}
+        currentTime={currentTime}
       />
 
-      {sortedWatchedUsers.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyStateTitle}>Todavía no agregaste contactos</Text>
-          <Text style={styles.emptyStateText}>Agrega el DNI de una persona. Recibirá una solicitud y deberá aprobarla antes de compartir su estado y teléfono.</Text>
-        </View>
-      ) : (
-        sortedWatchedUsers.map((watchedUser) => (
-          <WatchedUserCard
-            key={watchedUser.uid}
-            user={watchedUser}
-            onCall={callWatchedUser}
-            onWhatsApp={messageWatchedUser}
-            onRemove={removeWatchedUser}
-            currentTime={currentTime}
-          />
-        ))
-      )}
-
-      <Pressable style={styles.logoutButton} onPress={() => void onSignOut()}>
+      <Pressable style={styles.logoutButton} onPress={handleSignOut}>
         <Text style={styles.linkText}>Cerrar sesión</Text>
       </Pressable>
     </ScrollView>
@@ -298,31 +257,13 @@ export function HomeScreen({
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  container: {
+    flex: 1,
     backgroundColor: "#edf3ef",
+  },
+  contentContainer: {
     paddingHorizontal: 24,
     paddingVertical: 28,
-  },
-  statusCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 12,
-  },
-  statusLabel: {
-    color: "#6e8279",
-    fontSize: 12,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    fontWeight: "700",
-    marginBottom: 6,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#15231f",
-    marginBottom: 8,
   },
   subtitle: {
     fontSize: 15,
@@ -331,47 +272,6 @@ const styles = StyleSheet.create({
   },
   overdueText: {
     color: "#dc2626",
-    fontWeight: "700",
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#0f172a",
-    marginBottom: 10,
-  },
-  counterText: {
-    fontSize: 14,
-    color: "#475569",
-    marginBottom: 10,
-  },
-  emptyState: {
-    backgroundColor: "#fffdf8",
-    borderWidth: 1,
-    borderColor: "#d5dfd8",
-    borderRadius: 14,
-    padding: 18,
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  emptyStateTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#15231f",
-    marginBottom: 6,
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: "#587068",
-    lineHeight: 20,
-  },
-  profileMenuButton: {
-    backgroundColor: "#286052",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  profileMenuButtonText: {
-    color: "#fffdf8",
     fontWeight: "700",
   },
   logoutButton: {
@@ -391,7 +291,6 @@ const styles = StyleSheet.create({
     color: "#9d4e30",
     fontWeight: "700",
   },
-
   errorBanner: {
     backgroundColor: "#f8d7da",
     borderRadius: 8,
@@ -399,74 +298,9 @@ const styles = StyleSheet.create({
     borderColor: "#f5c6cb",
     padding: 12,
     marginBottom: 16,
-    color: "#842029",
-    fontSize: 14,
   },
   errorBannerText: {
     color: "#842029",
     fontWeight: "500",
-  },
-  requestCard: {
-    backgroundColor: "#fffdf8",
-    borderWidth: 1,
-    borderColor: "#d5dfd8",
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 18,
-  },
-  requestTitle: {
-    color: "#15231f",
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 6,
-  },
-  requestDisclosure: {
-    color: "#587068",
-    fontSize: 13,
-    lineHeight: 19,
-    marginBottom: 12,
-  },
-  requestRow: {
-    borderTopWidth: 1,
-    borderTopColor: "#e1e8e3",
-    paddingTop: 12,
-    marginTop: 8,
-  },
-  requestName: {
-    color: "#15231f",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 10,
-  },
-  requestActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 8,
-  },
-  requestButton: {
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  rejectButton: {
-    backgroundColor: "#f1f5f2",
-    borderWidth: 1,
-    borderColor: "#cbd8cf",
-  },
-  rejectButtonText: {
-    color: "#38564b",
-    fontWeight: "600",
-  },
-  approveButton: {
-    backgroundColor: "#286052",
-  },
-  approveButtonText: {
-    color: "#fffdf8",
-    fontWeight: "700",
-  },
-  requestError: {
-    color: "#b91c1c",
-    fontSize: 13,
-    marginBottom: 8,
   },
 });
