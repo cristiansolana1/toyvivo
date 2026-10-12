@@ -1,6 +1,6 @@
 import { collection, getDocs, doc, getDoc, query, orderBy, limit, getCountFromServer } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getDbInstance } from "./firebase.js";
-import { formatDate, escapeHtml, showErrorBoundary, showSkeleton, getProvinceLabel } from "./utils.js";
+import { formatDate, escapeHtml, showErrorBoundary, showSkeleton, getProvinceLabel, debounce } from "./utils.js";
 
 const db = getDbInstance();
 
@@ -182,11 +182,11 @@ function setupUserSearchAndPagination() {
 
   const searchInput = document.querySelector("#user-search");
   if (searchInput) {
-    searchInput.addEventListener("input", (e) => {
+    searchInput.addEventListener("input", debounce((e) => {
       currentSearch = e.target.value.trim();
       applyUserFilters();
       renderUsersTable();
-    });
+    }, 300));
   }
 
   const pagination = document.querySelector("#users-pagination");

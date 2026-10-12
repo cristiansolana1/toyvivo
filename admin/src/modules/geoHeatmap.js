@@ -1,6 +1,8 @@
 import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
-import { getDbInstance } from "../modules/firebase.js";
-import { showErrorBoundary, getProvinceLabel, PROVINCES_AR } from "../modules/utils.js";
+import { getDbInstance } from "./firebase.js";
+import { showErrorBoundary, getProvinceLabel, PROVINCES_AR } from "./utils.js";
+
+const db = getDbInstance();
 
 // Color scale for heatmap
 const HEATMAP_COLORS = [

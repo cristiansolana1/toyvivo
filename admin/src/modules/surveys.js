@@ -6,8 +6,9 @@ import { getDbInstance } from "./firebase.js";
 import { loadSurveyResults } from "./surveyResults.js";
 import { 
   formatDate, formatDateTime, escapeHtml, showErrorBoundary, 
-  showSkeleton, getSurveyStatus, getTargetingDisplay, PROVINCES_AR 
+  showSkeleton, getSurveyStatus, getTargetingDisplay, PROVINCES_AR, debounce
 } from "./utils.js";
+import { logAdminAction } from "./audit.js";
 
 const db = getDbInstance();
 const ADMIN_EMAIL = "cristiansolana1@gmail.com";
@@ -190,11 +191,11 @@ export function setupSurveyFilters() {
     renderSurveysTable();
   });
   
-  document.querySelector("#survey-search")?.addEventListener("input", (e) => {
+  document.querySelector("#survey-search")?.addEventListener("input", debounce((e) => {
     currentSearch = e.target.value.trim();
     applyFiltersAndSort();
     renderSurveysTable();
-  });
+  }, 300));
   
   document.querySelector("#survey-sort")?.addEventListener("change", (e) => {
     currentSort = e.target.value;
@@ -266,6 +267,8 @@ export async function confirmDeleteSurvey() {
 
     batch.delete(doc(db, "surveys", surveyToDelete.id));
     await batch.commit();
+
+    await logAdminAction("DELETE_SURVEY", surveyToDelete.id, { question: surveyToDelete.question });
 
     closeDeleteModal();
     await loadSurveysTable();

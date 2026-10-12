@@ -3,6 +3,7 @@ import { getDbInstance } from "./firebase.js";
 import { formatDateTimeForInput, escapeHtml } from "./utils.js";
 import { getAdminEmail } from "./auth.js";
 import { initDateTimePicker, updateTriggerDisplay } from "./datetimePicker.js";
+import { logAdminAction } from "./audit.js";
 
 const db = getDbInstance();
 const ADMIN_EMAIL = getAdminEmail();
@@ -163,14 +164,12 @@ export function setupSurveyModal() {
     
     try {
       await addDoc(collection(db, "surveys"), surveyData);
-      message.textContent = "Encuesta creada correctamente.";
-      
+      await logAdminAction("CREATE_SURVEY", null, { question });
+
       await window.loadSurveysTable?.();
       await window.loadSurveyResults?.();
       
-      setTimeout(() => {
-        closeSurveyModal();
-      }, 1000);
+      closeSurveyModal();
     } catch (error) {
       console.error("Error saving survey:", error);
       message.textContent = error.code === "permission-denied"
