@@ -2,6 +2,7 @@ import React, { memo } from "react";
 import { Pressable, StyleSheet, Text, View, Alert } from "react-native";
 import { WatchedUserStatus } from "../services/userService";
 import { isHeartbeatOverdue } from "../constants";
+import { formatDateTime24 } from "../utils/date";
 
 interface WatchedUserCardProps {
   user: WatchedUserStatus;
@@ -42,18 +43,32 @@ function WatchedUserCardComponent({ user, onCall, onWhatsApp, onRemove, currentT
         </View>
       </View>
       <Text style={[styles.status, overdue && styles.overdue]}>
-        Último aviso: {user.lastAliveAt ? new Date(user.lastAliveAt).toLocaleString() : "Sin aviso todavía"}
+        Último aviso: {user.lastAliveAt ? formatDateTime24(user.lastAliveAt) : "Sin aviso todavía"}
       </Text>
       <View style={styles.actions}>
         <View style={styles.primaryActions}>
-          <Pressable onPress={handleCall} disabled={!user.phone} accessibilityLabel="Llamar">
+          <Pressable
+            style={({ pressed }) => [styles.actionPressable, pressed && styles.pressed]}
+            onPress={handleCall}
+            disabled={!user.phone}
+            accessibilityLabel="Llamar"
+          >
             <Text style={[styles.callText, !user.phone && styles.callTextDisabled]}>Llamar</Text>
           </Pressable>
-          <Pressable onPress={handleWhatsAppMessage} disabled={!user.phone} accessibilityLabel="Enviar WhatsApp">
+          <Pressable
+            style={({ pressed }) => [styles.actionPressable, pressed && styles.pressed]}
+            onPress={handleWhatsAppMessage}
+            disabled={!user.phone}
+            accessibilityLabel="Enviar WhatsApp"
+          >
             <Text style={[styles.whatsappText, !user.phone && styles.callTextDisabled]}>WhatsApp</Text>
           </Pressable>
         </View>
-        <Pressable onPress={handleRemove} accessibilityLabel="Quitar usuario">
+        <Pressable
+          style={({ pressed }) => [styles.actionPressable, pressed && styles.pressed]}
+          onPress={handleRemove}
+          accessibilityLabel="Quitar usuario"
+        >
           <Text style={styles.removeText}>Quitar</Text>
         </Pressable>
       </View>
@@ -67,10 +82,15 @@ const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
     borderColor: "#d5dfd8",
-    backgroundColor: "#ffffff",
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
+    backgroundColor: "#fffdf8",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: "#244438",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   header: {
     flexDirection: "row",
@@ -87,7 +107,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#0f172a",
+    color: "#15231f",
   },
   badge: {
     borderRadius: 999,
@@ -108,8 +128,8 @@ const styles = StyleSheet.create({
   },
   status: {
     fontSize: 14,
-    color: "#334155",
-    marginBottom: 10,
+    color: "#38564b",
+    marginBottom: 12,
     lineHeight: 20,
   },
   overdue: {
@@ -122,12 +142,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexWrap: "wrap",
     gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#eef2ef",
+    paddingTop: 10,
   },
   primaryActions: {
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "wrap",
     gap: 16,
+  },
+  actionPressable: {
+    paddingVertical: 4,
+  },
+  pressed: {
+    opacity: 0.6,
   },
   callText: {
     color: "#2563eb",

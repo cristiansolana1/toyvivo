@@ -1,36 +1,6 @@
 import { collection, getDocs } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getDbInstance } from "../modules/firebase.js";
-import { showErrorBoundary } from "../modules/utils.js";
-
-const db = getDbInstance();
-
-// Province codes and labels for Argentina
-const PROVINCES_AR = [
-  { code: "BA", label: "Buenos Aires", lat: -34.6037, lng: -58.3816 },
-  { code: "CABA", label: "CABA", lat: -34.6037, lng: -58.3816 },
-  { code: "CT", label: "Catamarca", lat: -28.4696, lng: -65.7852 },
-  { code: "CH", label: "Chaco", lat: -27.4514, lng: -58.9867 },
-  { code: "CU", label: "Chubut", lat: -43.2944, lng: -65.3057 },
-  { code: "CB", label: "Córdoba", lat: -31.4201, lng: -64.1888 },
-  { code: "CR", label: "Corrientes", lat: -27.4692, lng: -58.8306 },
-  { code: "ER", label: "Entre Ríos", lat: -31.7353, lng: -60.5227 },
-  { code: "FO", label: "Formosa", lat: -26.1775, lng: -58.1781 },
-  { code: "JY", label: "Jujuy", lat: -24.1858, lng: -65.2995 },
-  { code: "LP", label: "La Pampa", lat: -36.6168, lng: -64.2833 },
-  { code: "LR", label: "La Rioja", lat: -29.4111, lng: -66.8507 },
-  { code: "MZ", label: "Mendoza", lat: -32.8895, lng: -68.8458 },
-  { code: "MI", label: "Misiones", lat: -27.3671, lng: -55.8967 },
-  { code: "NQ", label: "Neuquén", lat: -38.9516, lng: -68.0591 },
-  { code: "RN", label: "Río Negro", lat: -40.8135, lng: -63.0000 },
-  { code: "SA", label: "Salta", lat: -24.7859, lng: -65.4117 },
-  { code: "SJ", label: "San Juan", lat: -31.5375, lng: -68.5364 },
-  { code: "SL", label: "San Luis", lat: -33.2993, lng: -66.3350 },
-  { code: "SC", label: "Santa Cruz", lat: -50.0165, lng: -68.5245 },
-  { code: "SF", label: "Santa Fe", lat: -31.6333, lng: -60.7000 },
-  { code: "SE", label: "Santiago del Estero", lat: -27.7951, lng: -64.2615 },
-  { code: "TF", label: "Tierra del Fuego", lat: -54.8019, lng: -68.3030 },
-  { code: "TM", label: "Tucumán", lat: -26.8241, lng: -65.2226 },
-];
+import { showErrorBoundary, getProvinceLabel, PROVINCES_AR } from "../modules/utils.js";
 
 // Color scale for heatmap
 const HEATMAP_COLORS = [
@@ -88,7 +58,7 @@ function renderGeoHeatmap(container, provinceCounts) {
   const sortedProvinces = PROVINCES_AR
     .map(p => ({
       ...p,
-      count: provinceCounts[p.code] || 0
+      count: provinceCounts[p.code] || provinceCounts[p.label] || 0
     }))
     .sort((a, b) => b.count - a.count);
 
@@ -113,7 +83,7 @@ function renderGeoHeatmap(container, provinceCounts) {
         const color = getColorForCount(province.count);
         const pct = totalUsers > 0 ? ((province.count / totalUsers) * 100).toFixed(1) : "0.0";
         return `
-          <div class="geo-province-card" style="--province-color: ${color};" title="${province.label}: ${province.count} usuario${province.count !== 1 ? 's' : ''} (${pct}%)">
+          <div class="geo-province-card clickable-province" data-province-code="${province.code}" data-province-label="${province.label}" style="--province-color: ${color}; cursor: pointer;" title="Ver usuarios de ${province.label}: ${province.count} usuario${province.count !== 1 ? 's' : ''} (${pct}%)">
             <div class="geo-province-name">${province.label}</div>
             <div class="geo-province-count">${province.count} <small style="font-size: 13px; color: #6e8279; font-weight: normal;">(${pct}%)</small></div>
             <div class="geo-province-bar" style="background: ${color}; width: ${Math.min((province.count / Math.max(1, ...Object.values(provinceCounts))) * 100, 100)}%"></div>
@@ -122,6 +92,20 @@ function renderGeoHeatmap(container, provinceCounts) {
       }).join("")}
     </div>
   `;
+
+  container.querySelectorAll(".clickable-province").forEach(card => {
+    card.addEventListener("click", () => {
+      const provinceLabel = card.dataset.provinceLabel;
+      const provinceCode = card.dataset.provinceCode;
+
+      const usersLink = document.querySelector('.sidebar-link[data-view="users"]');
+      if (usersLink) {
+        usersLink.click();
+      }
+
+      window.filterUsersByProvince?.(provinceLabel, provinceCode);
+    });
+  });
 }
 
 window.loadGeoHeatmap = loadGeoHeatmap;

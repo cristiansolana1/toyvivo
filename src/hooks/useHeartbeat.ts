@@ -9,6 +9,7 @@ import {
 } from "../services/notificationService";
 import { HeartbeatEntry } from "../types";
 import { isHeartbeatOverdue, formatHeartbeatCountdown, HEARTBEAT_LIMIT_MS } from "../constants";
+import { formatDateTime24 } from "../utils/date";
 
 interface UseHeartbeatReturn {
   lastHeartbeat: string | null;
@@ -141,7 +142,7 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
   const formattedLastHeartbeat = loading
     ? "Cargando..."
     : lastHeartbeat
-      ? new Date(lastHeartbeat).toLocaleString()
+      ? formatDateTime24(lastHeartbeat)
       : "Sin registro todavía.";
 
   const overdue = !loading && isHeartbeatOverdue(lastHeartbeat, currentTime);

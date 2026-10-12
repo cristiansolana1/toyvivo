@@ -44,7 +44,7 @@ export function AuthScreen({ onAccountCreated }: { onAccountCreated: (user: User
         </View>
 
         <Text style={styles.eyebrow}>Seguridad para tu familia</Text>
-        <Text style={styles.title}>Aviso de vida</Text>
+        <Text style={styles.title}>Estoy bien</Text>
         <Text style={styles.subtitle}>Accede una sola vez para dejar tu sesión guardada y cuidar a tus contactos.</Text>
 
         <View style={styles.formCard}>

@@ -43,3 +43,18 @@ export function getAgeFromISODate(isoDate: string): number | null {
   }
   return age;
 }
+
+export function formatDateTime24(isoDate: string): string {
+  if (!isoDate) return "";
+  const date = new Date(isoDate);
+  if (isNaN(date.getTime())) return isoDate;
+  return date.toLocaleString([], {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}

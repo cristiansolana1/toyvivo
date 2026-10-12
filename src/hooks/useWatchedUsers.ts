@@ -25,6 +25,14 @@ export function useWatchedUsers(userId: string): UseWatchedUsersReturn {
   const [watchMessage, setWatchMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!watchMessage) return;
+    const timer = setTimeout(() => {
+      setWatchMessage(null);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [watchMessage]);
+
+  useEffect(() => {
     return subscribeToWatchingUserIds(
       userId,
       (ids) => {

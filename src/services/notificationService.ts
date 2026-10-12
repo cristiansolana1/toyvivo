@@ -37,7 +37,7 @@ export async function clearBadgeCountAsync(): Promise<void> {
 export async function setupNotificationChannels(): Promise<void> {
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("heartbeat", {
-      name: "Avisos de Vida",
+      name: "Estoy bien",
       description: "Notificaciones de disponibilidad del botón Estoy Bien",
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
@@ -222,6 +222,27 @@ export async function sendSurveyNotification(
     return notificationId;
   } catch (error) {
     console.warn("Error sending survey notification:", error);
+    return null;
+  }
+}
+
+export async function sendContactRequestNotification(requesterName: string): Promise<string | null> {
+  if (Platform.OS === "web") return null;
+  try {
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Nueva solicitud de contacto 👥",
+        body: `${requesterName} quiere agregarte como contacto de seguridad.`,
+        data: { type: "contact_request" },
+        sound: true,
+        channelId: "heartbeat",
+        visibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      },
+      trigger: null,
+    });
+    return notificationId;
+  } catch (error) {
+    console.warn("Error sending contact request notification:", error);
     return null;
   }
 }

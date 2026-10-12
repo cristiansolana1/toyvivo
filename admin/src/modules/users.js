@@ -1,6 +1,6 @@
 import { collection, getDocs, doc, getDoc, query, orderBy, limit, getCountFromServer } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 import { getDbInstance } from "./firebase.js";
-import { formatDate, escapeHtml, showErrorBoundary, showSkeleton } from "./utils.js";
+import { formatDate, escapeHtml, showErrorBoundary, showSkeleton, getProvinceLabel } from "./utils.js";
 
 const db = getDbInstance();
 
@@ -10,7 +10,19 @@ let currentPage = 1;
 const pageSize = 10;
 let currentSearch = "";
 let currentStatusFilter = "";
+let currentProvinceFilter = "";
 let listenersInitialized = false;
+
+export function filterUsersByProvince(provinceLabel, provinceCode) {
+  currentProvinceFilter = provinceLabel;
+  const searchInput = document.querySelector("#user-search");
+  if (searchInput) {
+    searchInput.value = provinceLabel;
+  }
+  applyUserFilters();
+  renderUsersTable();
+}
+window.filterUsersByProvince = filterUsersByProvince;
 
 export async function loadUsersTable() {
   const tbody = document.querySelector("#users-tbody");
@@ -66,6 +78,15 @@ function applyUserFilters() {
       const lastAliveMs = user.lastAliveAt ? (user.lastAliveAt.toMillis ? user.lastAliveAt.toMillis() : new Date(user.lastAliveAt).getTime()) : 0;
       const hoursDiff = (Date.now() - lastAliveMs) / (1000 * 60 * 60);
       if (lastAliveMs > 0 && hoursDiff <= 48) return false;
+    }
+
+    if (currentProvinceFilter) {
+      const p = profile || {};
+      const userProv = p.province || "";
+      const userProvLabel = getProvinceLabel(userProv);
+      if (userProv !== currentProvinceFilter && userProvLabel !== currentProvinceFilter) {
+        return false;
+      }
     }
 
     if (!currentSearch) return true;

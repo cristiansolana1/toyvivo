@@ -36,12 +36,13 @@ function HeartbeatButtonComponent({
   return (
     <View style={styles.container}>
       <Pressable
-        style={[
+        style={({ pressed }) => [
           styles.button,
           isPrimaryAction && styles.primaryActionActive,
           !isPrimaryAction && styles.disabled,
           !isOnline && styles.offline,
           buttonDisabled && styles.disabled,
+          pressed && styles.pressed,
         ]}
         onPress={onPress}
         disabled={buttonDisabled}
@@ -76,26 +77,30 @@ const styles = StyleSheet.create({
   },
   button: {
     width: "100%",
-    borderRadius: 28,
+    borderRadius: 16,
     minHeight: 164,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#16a34a",
+    backgroundColor: "#286052",
     paddingHorizontal: 20,
     paddingVertical: 18,
-    shadowColor: "#166534",
-    shadowOpacity: 0.2,
+    shadowColor: "#244438",
+    shadowOpacity: 0.12,
     shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
+    shadowOffset: { width: 0, height: 10 },
     elevation: 4,
   },
+  pressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.95,
+  },
   primaryActionActive: {
-    backgroundColor: "#15803d",
-    shadowOpacity: 0.35,
+    backgroundColor: "#1f4c40",
+    shadowOpacity: 0.25,
     shadowRadius: 22,
     elevation: 8,
     borderWidth: 2,
-    borderColor: "#86efac",
+    borderColor: "#a3c4b9",
   },
   disabled: {
     backgroundColor: "#94a3b8",
@@ -103,16 +108,16 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   offline: {
-    backgroundColor: "#f59e0b",
+    backgroundColor: "#d97706",
   },
   text: {
-    color: "#fff",
+    color: "#fffdf8",
     fontSize: 30,
     fontWeight: "800",
     textAlign: "center",
   },
   helperText: {
-    color: "rgba(255,255,255,0.9)",
+    color: "rgba(255,253,248,0.9)",
     fontSize: 12,
     fontWeight: "600",
     marginTop: 8,
@@ -136,7 +141,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: -8,
     right: 18,
-    backgroundColor: "#3b82f6",
+    backgroundColor: "#2563eb",
     borderRadius: 10,
     paddingHorizontal: 8,
     paddingVertical: 2,

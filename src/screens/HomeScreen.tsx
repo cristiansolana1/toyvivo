@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useToast } from "../hooks/useToast";
-import { Linking, RefreshControl, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Keyboard, Linking, RefreshControl, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 import { useWatchedUsers } from "../hooks/useWatchedUsers";
@@ -126,7 +126,7 @@ export function HomeScreen({
     }
 
     const whatsappNumber = digits.startsWith("54") ? digits : `54${digits.replace(/^0+/, "")}`;
-    const message = encodeURIComponent("Hola, te escribo desde la app de Aviso de vida.");
+    const message = encodeURIComponent("Hola, te escribo desde la app Estoy bien.");
     const appUrl = `whatsapp://send?phone=${whatsappNumber}&text=${message}`;
     const webUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
 
@@ -144,6 +144,7 @@ export function HomeScreen({
   }, []);
 
   const handleAddWatch = useCallback(async () => {
+    Keyboard.dismiss();
     const ok = await addWatchedUser(watchDni);
     if (ok) setWatchDni("");
   }, [addWatchedUser, watchDni]);
@@ -183,6 +184,23 @@ export function HomeScreen({
         showProfileEditor={showProfileEditor}
         onToggleProfileEditor={handleToggleProfileEditor}
       />
+
+      {!isOnline && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineBannerTitle}>Sin conexión a internet</Text>
+          <Text style={styles.offlineBannerText}>
+            Tus avisos se guardarán localmente y se sincronizarán automáticamente al reconectar.
+          </Text>
+        </View>
+      )}
+
+      {sending && pendingCount > 0 && (
+        <View style={styles.syncBanner}>
+          <Text style={styles.syncBannerText}>
+            Sincronizando {pendingCount} aviso{pendingCount > 1 ? "s" : ""} pendiente{pendingCount > 1 ? "s" : ""}...
+          </Text>
+        </View>
+      )}
 
       {entryError && (
         <View style={styles.errorBanner}>
@@ -305,5 +323,38 @@ const styles = StyleSheet.create({
   errorBannerText: {
     color: "#842029",
     fontWeight: "500",
+  },
+  offlineBanner: {
+    backgroundColor: "#fef3c7",
+    borderWidth: 1,
+    borderColor: "#f59e0b",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  offlineBannerTitle: {
+    color: "#b45309",
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  offlineBannerText: {
+    color: "#92400e",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  syncBanner: {
+    backgroundColor: "#dbeafe",
+    borderWidth: 1,
+    borderColor: "#3b82f6",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    alignItems: "center",
+  },
+  syncBannerText: {
+    color: "#1e40af",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
