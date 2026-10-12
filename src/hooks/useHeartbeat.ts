@@ -13,6 +13,7 @@ import { isHeartbeatOverdue, formatHeartbeatCountdown, HEARTBEAT_LIMIT_MS } from
 interface UseHeartbeatReturn {
   lastHeartbeat: string | null;
   sending: boolean;
+  loading: boolean;
   currentTime: number;
   formattedLastHeartbeat: string;
   overdue: boolean;
@@ -26,6 +27,7 @@ interface UseHeartbeatReturn {
 
 export function useHeartbeat(userId: string): UseHeartbeatReturn {
   const [lastHeartbeat, setLastHeartbeat] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [pendingCount, setPendingCount] = useState(0);
@@ -39,12 +41,43 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
 
   useEffect(() => {
     let active = true;
-    loadLastHeartbeat(userId).then((value) => {
-      if (active) setLastHeartbeat(value);
-    });
-    getPendingHeartbeats(userId).then((pending: HeartbeatEntry[]) => {
-      if (active) setPendingCount(pending.length);
-    });
+    async function init() {
+      setLoading(true);
+      try {
+        const value = await loadLastHeartbeat(userId);
+        if (active) setLastHeartbeat(value);
+      } catch (error) {
+        console.error("Error loading last heartbeat on init:", error);
+      } finally {
+        if (active) setLoading(false);
+      }
+
+      const pending = await getPendingHeartbeats(userId);
+      if (active) {
+        setPendingCount(pending.length);
+        if (pending.length > 0) {
+          const state = await NetInfo.fetch();
+          if (state.isConnected === true) {
+            setSending(true);
+            try {
+              const result = await syncPendingHeartbeats(userId);
+              if (active) {
+                setPendingCount((prev) => Math.max(0, prev - result.synced));
+                const updatedValue = await loadLastHeartbeat(userId);
+                if (active && updatedValue) {
+                  setLastHeartbeat(updatedValue);
+                }
+              }
+            } catch (error) {
+              console.error("Error syncing pending heartbeats on startup:", error);
+            } finally {
+              if (active) setSending(false);
+            }
+          }
+        }
+      }
+    }
+    void init();
     return () => {
       active = false;
     };
@@ -72,7 +105,6 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
     } catch (error) {
       console.error("Error sending heartbeat:", error);
       setSending(false);
-      // Error is already handled by syncPending on reconnection
     } finally {
       setSending(false);
     }
@@ -84,6 +116,10 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
     try {
       const result = await syncPendingHeartbeats(userId);
       setPendingCount((prev) => prev - result.synced);
+      const updatedValue = await loadLastHeartbeat(userId);
+      if (updatedValue) {
+        setLastHeartbeat(updatedValue);
+      }
     } finally {
       setSending(false);
     }
@@ -102,24 +138,14 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
     return unsubscribe;
   }, [userId, pendingCount, syncPending]);
 
-  useEffect(() => {
-    let active = true;
-    getPendingHeartbeats(userId).then((pending: HeartbeatEntry[]) => {
-      if (active) setPendingCount(pending.length);
-    });
-    return () => {
-      active = false;
-    };
-  }, [userId]);
+  const formattedLastHeartbeat = loading
+    ? "Cargando..."
+    : lastHeartbeat
+      ? new Date(lastHeartbeat).toLocaleString()
+      : "Sin registro todavía.";
 
-  const formattedLastHeartbeat = lastHeartbeat
-    ? new Date(lastHeartbeat).toLocaleString()
-    : "Sin registro todavía.";
-
-  const overdue = isHeartbeatOverdue(lastHeartbeat, currentTime);
+  const overdue = !loading && isHeartbeatOverdue(lastHeartbeat, currentTime);
   const countdownText = formatHeartbeatCountdown(lastHeartbeat, currentTime);
-
-  const prevOverdueRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     void requestNotificationPermissions().then((granted) => {
@@ -139,6 +165,7 @@ export function useHeartbeat(userId: string): UseHeartbeatReturn {
   return {
     lastHeartbeat,
     sending,
+    loading,
     currentTime,
     formattedLastHeartbeat,
     overdue,

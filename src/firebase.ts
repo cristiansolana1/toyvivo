@@ -27,6 +27,6 @@ export const auth =
       });
 export const db = getFirestore(app);
 
-if (typeof window !== "undefined") {
+if (Platform.OS === "web" && typeof window !== "undefined") {
   FirebaseAuth.setPersistence(auth, FirebaseAuth.browserLocalPersistence).catch(() => {});
 }

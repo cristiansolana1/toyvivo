@@ -57,6 +57,10 @@ export async function loadLastHeartbeat(uid: string): Promise<string | null> {
   return AsyncStorage.getItem(safeLastHeartbeatKey(uid));
 }
 
+export async function updateLastHeartbeat(uid: string, timestamp: string): Promise<void> {
+  await AsyncStorage.setItem(safeLastHeartbeatKey(uid), timestamp);
+}
+
 export async function addPendingHeartbeat(uid: string, heartbeat: HeartbeatEntry): Promise<void> {
   const raw = await AsyncStorage.getItem(safePendingHeartbeatsKey(uid));
   const pending = raw ? (JSON.parse(raw) as HeartbeatEntry[]) : [];

@@ -11,9 +11,11 @@ import { validateProfile, getFirstValidationError, normalizeDNI } from "../utils
 export function ProfileSetupScreen({
   onSaveProfile,
   saving,
+  email,
 }: {
   onSaveProfile: (profile: UserProfile) => Promise<void>;
   saving: boolean;
+  email?: string | null;
 }) {
   const [fullName, setFullName] = useState("");
   const [dni, setDni] = useState("");
@@ -75,6 +77,12 @@ export function ProfileSetupScreen({
 
       <View style={styles.sectionCard}>
         <Text style={styles.sectionTitle}>Información personal</Text>
+        {email ? (
+          <>
+            <Text style={styles.pickerLabel}>Correo electrónico (No editable)</Text>
+            <Text style={styles.fixedCountryText}>{email}</Text>
+          </>
+        ) : null}
         <TextInput style={styles.input} placeholder="Nombre completo" placeholderTextColor="#64748b" value={fullName} onChangeText={setFullName} />
         <TextInput
           style={styles.input}

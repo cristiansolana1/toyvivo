@@ -85,6 +85,12 @@ export async function setupNotificationCategories(): Promise<void> {
   }
 }
 
+// Ensure channels are set up on initialization for Android
+if (Platform.OS === "android") {
+  void setupNotificationChannels();
+  void setupNotificationCategories();
+}
+
 export async function registerForPushTokenAsync(userId: string): Promise<string | null> {
   if (Platform.OS === "web") return null;
   try {
@@ -143,7 +149,6 @@ export async function scheduleHeartbeatReminders(lastHeartbeat: string | null): 
     const secondsUntil24Hours = Math.round(24 * 3600 - elapsedSeconds);
 
     if (secondsUntil24Hours > 0) {
-      // Programar la notificación para que se active ÚNICAMENTE cuando se cumplan las 24 horas exactas
       await Notifications.scheduleNotificationAsync({
         content: {
           title: "¡Botón 'Estoy bien' disponible! 🟢",
@@ -152,6 +157,7 @@ export async function scheduleHeartbeatReminders(lastHeartbeat: string | null): 
           sound: true,
           channelId: "heartbeat",
           categoryIdentifier: HEARTBEAT_CATEGORY_ID,
+          visibility: Notifications.AndroidNotificationVisibility.PUBLIC,
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -185,6 +191,7 @@ export async function sendHeartbeatAvailableNotification(): Promise<string | nul
         sound: true,
         channelId: "heartbeat",
         categoryIdentifier: HEARTBEAT_CATEGORY_ID,
+        visibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       },
       trigger: null,
     });
@@ -208,6 +215,7 @@ export async function sendSurveyNotification(
         data: { type: "new_survey", surveyId },
         sound: true,
         channelId: "surveys",
+        visibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       },
       trigger: null,
     });
@@ -246,5 +254,3 @@ export function registerNotificationResponseListener(
     subscription.remove();
   };
 }
-
-

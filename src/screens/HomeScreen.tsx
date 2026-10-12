@@ -37,6 +37,7 @@ export function HomeScreen({
   const {
     lastHeartbeat,
     sending,
+    loading,
     currentTime,
     formattedLastHeartbeat,
     overdue,
@@ -202,6 +203,7 @@ export function HomeScreen({
           onSave={handleSaveProfile}
           onCancel={() => setShowProfileEditor(false)}
           saving={saving}
+          email={user?.email}
           onDelete={async () => {
             await deleteUserAccount(user.uid);
             await onSignOut();
@@ -227,8 +229,9 @@ export function HomeScreen({
 
       <HeartbeatButton
         onPress={handleHeartbeat}
-        disabled={sending || !overdue}
+        disabled={sending || loading || !overdue}
         sending={sending}
+        loading={loading}
         countdownText={countdownText}
         overdue={overdue}
         pendingCount={pendingCount}

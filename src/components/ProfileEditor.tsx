@@ -13,9 +13,10 @@ interface ProfileEditorProps {
   onCancel: () => void;
   saving: boolean;
   onDelete?: () => Promise<void>;
+  email?: string | null;
 }
 
-function ProfileEditorComponent({ profile, onSave, onCancel, saving, onDelete }: ProfileEditorProps) {
+function ProfileEditorComponent({ profile, onSave, onCancel, saving, onDelete, email }: ProfileEditorProps) {
   const [phone, setPhone] = useState(profile.phone);
   const [province, setProvince] = useState(profile.province ?? "BA");
   const [localSaving, setLocalSaving] = useState(false);
@@ -77,6 +78,13 @@ function ProfileEditorComponent({ profile, onSave, onCancel, saving, onDelete }:
 
   return (
     <View style={styles.editor}>
+      {email ? (
+        <>
+          <Text style={styles.fieldLabel}>Correo electrónico (No editable)</Text>
+          <Text style={styles.readOnlyText}>{email}</Text>
+        </>
+      ) : null}
+
       <Text style={styles.fieldLabel}>Nombre completo (No editable)</Text>
       <Text style={styles.readOnlyText}>{profile.fullName}</Text>
 

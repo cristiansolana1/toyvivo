@@ -4,6 +4,7 @@ import { HeartbeatEntry } from "../types";
 import { 
   saveHeartbeat as saveLocalHeartbeat, 
   loadLastHeartbeat as loadLocalLastHeartbeat,
+  updateLastHeartbeat,
   loadUserProfile,
   addPendingHeartbeat,
   getPendingHeartbeats,
@@ -54,6 +55,8 @@ export async function sendHeartbeat(uid: string, heartbeat: HeartbeatEntry): Pro
   
   try {
     await persistHeartbeat(uid, heartbeat);
+    // Fetch authoritative server timestamp from Firestore and sync to local storage
+    await loadLastHeartbeat(uid);
     return { success: true, queued: false };
   } catch (error) {
     console.error("sendHeartbeat error:", error);
@@ -80,14 +83,16 @@ export async function syncPendingHeartbeats(uid: string): Promise<{ synced: numb
     }
   }
 
+  if (synced > 0) {
+    // Reconcile local last heartbeat with Firestore server timestamp
+    await loadLastHeartbeat(uid);
+  }
+
   return { synced, failed };
 }
 
 export async function loadLastHeartbeat(uid: string): Promise<string | null> {
-  const localLast = await loadLocalLastHeartbeat(uid);
-  if (localLast) {
-    return localLast;
-  }
+  let firestoreTimestamp: string | null = null;
 
   try {
     const userDoc = await getDoc(doc(db, "users", uid));
@@ -95,29 +100,39 @@ export async function loadLastHeartbeat(uid: string): Promise<string | null> {
       const data = userDoc.data();
       const lastAliveAt = data.lastAliveAt;
       if (lastAliveAt) {
-        const timestamp = typeof lastAliveAt.toDate === "function"
+        firestoreTimestamp = typeof lastAliveAt.toDate === "function"
           ? lastAliveAt.toDate().toISOString()
           : new Date(lastAliveAt).toISOString();
-        return timestamp;
       }
     }
 
-    const statusDoc = await getDoc(doc(db, "userStatus", uid));
-    if (statusDoc.exists()) {
-      const data = statusDoc.data();
-      const lastAliveAt = data.lastAliveAt;
-      if (lastAliveAt) {
-        const timestamp = typeof lastAliveAt.toDate === "function"
-          ? lastAliveAt.toDate().toISOString()
-          : new Date(lastAliveAt).toISOString();
-        return timestamp;
+    if (!firestoreTimestamp) {
+      const statusDoc = await getDoc(doc(db, "userStatus", uid));
+      if (statusDoc.exists()) {
+        const data = statusDoc.data();
+        const lastAliveAt = data.lastAliveAt;
+        if (lastAliveAt) {
+          firestoreTimestamp = typeof lastAliveAt.toDate === "function"
+            ? lastAliveAt.toDate().toISOString()
+            : new Date(lastAliveAt).toISOString();
+        }
       }
     }
   } catch (error) {
-    console.error("Error loading last heartbeat from Firestore:", error);
+    console.warn("Could not fetch last heartbeat from Firestore, falling back to local:", error);
   }
 
-  return null;
+  const localLast = await loadLocalLastHeartbeat(uid);
+
+  if (firestoreTimestamp) {
+    // Reconcile local storage with Firestore server timestamp if different
+    if (!localLast || firestoreTimestamp !== localLast) {
+      await updateLastHeartbeat(uid, firestoreTimestamp).catch(() => {});
+    }
+    return firestoreTimestamp;
+  }
+
+  return localLast;
 }
 
 export { getPendingHeartbeats } from "../storage";

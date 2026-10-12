@@ -5,6 +5,7 @@ interface HeartbeatButtonProps {
   onPress: () => void;
   disabled: boolean;
   sending: boolean;
+  loading: boolean;
   countdownText: string;
   overdue: boolean;
   pendingCount: number;
@@ -15,19 +16,22 @@ function HeartbeatButtonComponent({
   onPress,
   disabled,
   sending,
+  loading,
   countdownText,
   overdue,
   pendingCount,
   isOnline,
 }: HeartbeatButtonProps) {
-  const buttonDisabled = disabled || sending;
+  const buttonDisabled = disabled || sending || loading;
   const isPrimaryAction = overdue && isOnline && !buttonDisabled;
-  const headline = sending ? "Enviando..." : overdue ? "Estoy bien" : countdownText;
-  const helperText = sending
-    ? "Sincronizando con tu seguridad."
-    : overdue
-      ? "Pulsa para avisar a tus contactos."
-      : `Próximo aviso disponible en ${countdownText}`;
+  const headline = loading ? "Cargando..." : sending ? "Enviando..." : overdue ? "Estoy bien" : countdownText;
+  const helperText = loading
+    ? "Verificando estado..."
+    : sending
+      ? "Sincronizando con tu seguridad."
+      : overdue
+        ? "Pulsa para avisar a tus contactos."
+        : `Próximo aviso disponible en ${countdownText}`;
 
   return (
     <View style={styles.container}>

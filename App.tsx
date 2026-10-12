@@ -1,7 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   User,
   onAuthStateChanged,
@@ -79,7 +79,7 @@ export default function App() {
   if (bootLoading) {
     return (
       <SafeAreaProvider>
-        <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
           <View style={styles.loaderWrap}>
             <Image
               source={require("./assets/icon.png")}
@@ -89,14 +89,14 @@ export default function App() {
             <ActivityIndicator size="large" color="#286052" style={styles.spinner} />
             <Text style={styles.subtitle}>Cargando aplicación...</Text>
           </View>
-        </SafeAreaView>
+        </View>
       </SafeAreaProvider>
     );
   }
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <ErrorBoundary>
           {!user ? (
             <>
@@ -131,6 +131,7 @@ export default function App() {
             <ProfileSetupScreen
               onSaveProfile={saveProfile}
               saving={profileSaving}
+              email={user?.email}
             />
             </>
           ) : (
@@ -144,7 +145,7 @@ export default function App() {
           )}
         </ErrorBoundary>
         <StatusBar style="auto" />
-      </SafeAreaView>
+      </View>
     </SafeAreaProvider>
   );
 }
