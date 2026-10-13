@@ -151,7 +151,7 @@ export function setupSurveyModal() {
     const surveyData = {
       question,
       options,
-      active: false,
+      active: true,
       createdBy: ADMIN_EMAIL,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

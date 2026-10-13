@@ -60,8 +60,8 @@ export async function loadSurveyResults() {
           <small></small>
           <div class="survey-meta">
             <span class="survey-status-badge ${status.class}">${status.text}</span>
-            ${survey.startAt ? `<span>Inicio: ${formatDateTime(survey.startAt)}</span>` : ""}
-            ${survey.endAt ? `<span>Fin: ${formatDateTime(survey.endAt)}</span>` : ""}
+            ${survey.startAt ? `<span>Inicio: ${formatDate(survey.startAt)}</span>` : ""}
+            ${survey.endAt ? `<span>Fin: ${formatDate(survey.endAt)}</span>` : ""}
           </div>
         </div>
         <strong>${survey.totalResponses} respuesta${survey.totalResponses === 1 ? "" : "s"}</strong>

@@ -6,6 +6,13 @@ const dayNames = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"];
 let datetimePickerTarget = null;
 let datetimePickerDate = new Date();
 
+function toLocalDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 export function openDateTimePicker(targetInput, triggerBtn) {
   datetimePickerTarget = targetInput;
   const dropdown = document.querySelector("#datetime-picker-dropdown");
@@ -64,20 +71,20 @@ function renderDateTimePicker() {
   const prevMonthDays = new Date(year, month, 0).getDate();
   
   const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
+  const todayStr = toLocalDateStr(today);
   
-  const selectedStr = datetimePickerTarget?.value ? new Date(datetimePickerTarget.value).toISOString().split("T")[0] : "";
+  const selectedStr = datetimePickerTarget?.value ? toLocalDateStr(new Date(datetimePickerTarget.value)) : "";
   
   let daysHtml = "";
   
   for (let i = startDay - 1; i >= 0; i--) {
     const d = prevMonthDays - i;
-    const dateStr = new Date(year, month - 1, d).toISOString().split("T")[0];
+    const dateStr = toLocalDateStr(new Date(year, month - 1, d));
     daysHtml += `<button type="button" class="datetime-picker-day other-month" data-date="${dateStr}">${d}</button>`;
   }
   
   for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = new Date(year, month, d).toISOString().split("T")[0];
+    const dateStr = toLocalDateStr(new Date(year, month, d));
     const isToday = dateStr === todayStr;
     const isSelected = dateStr === selectedStr;
     let classes = "datetime-picker-day";
@@ -89,7 +96,7 @@ function renderDateTimePicker() {
   const totalCells = startDay + daysInMonth;
   const nextMonthDays = (7 - (totalCells % 7)) % 7;
   for (let d = 1; d <= nextMonthDays; d++) {
-    const dateStr = new Date(year, month + 1, d).toISOString().split("T")[0];
+    const dateStr = toLocalDateStr(new Date(year, month + 1, d));
     daysHtml += `<button type="button" class="datetime-picker-day other-month" data-date="${dateStr}">${d}</button>`;
   }
   
@@ -103,8 +110,8 @@ function renderDateTimePicker() {
       document.querySelectorAll(".datetime-picker-day.selected").forEach(el => el.classList.remove("selected"));
       e.target.classList.add("selected");
       const dateStr = e.target.dataset.date;
-      const [year, month, day] = dateStr.split("-").map(Number);
-      datetimePickerDate = new Date(year, month - 1, day, datetimePickerDate.getHours(), datetimePickerDate.getMinutes());
+      const [y, m, d] = dateStr.split("-").map(Number);
+      datetimePickerDate.setFullYear(y, m - 1, d);
     });
   });
   
@@ -131,8 +138,12 @@ function renderDateTimePicker() {
   };
   
   document.querySelector("#datetime-picker-confirm").onclick = () => {
-    const isoString = datetimePickerDate.toISOString().slice(0, 16);
-    datetimePickerTarget.value = isoString;
+    const year = datetimePickerDate.getFullYear();
+    const month = String(datetimePickerDate.getMonth() + 1).padStart(2, "0");
+    const day = String(datetimePickerDate.getDate()).padStart(2, "0");
+    const hours = String(datetimePickerDate.getHours()).padStart(2, "0");
+    const minutes = String(datetimePickerDate.getMinutes()).padStart(2, "0");
+    datetimePickerTarget.value = `${year}-${month}-${day}T${hours}:${minutes}`;
     updateTriggerDisplay(datetimePickerTarget);
     closeDateTimePicker();
   };

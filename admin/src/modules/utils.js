@@ -129,10 +129,10 @@ export function escapeHtml(text) {
 
 export function getSurveyStatus(survey) {
   const now = Date.now();
-  const start = survey.startAt?.toMillis?.() ?? 0;
-  const end = survey.endAt?.toMillis?.() ?? 0;
+  const start = survey.startAt?.toMillis?.() ?? (survey.startAt instanceof Date ? survey.startAt.getTime() : 0);
+  const end = survey.endAt?.toMillis?.() ?? (survey.endAt instanceof Date ? survey.endAt.getTime() : 0);
   
-  if (!survey.active) return { text: "Desactivada", class: "status-inactive" };
+  if (survey.active === false) return { text: "Desactivada", class: "status-inactive" };
   if (start && now < start) return { text: "Programada", class: "status-never" };
   if (end && now > end) return { text: "Finalizada", class: "status-inactive" };
   return { text: "Activa", class: "status-active" };

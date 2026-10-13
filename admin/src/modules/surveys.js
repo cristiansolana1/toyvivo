@@ -119,8 +119,8 @@ function renderSurveysTable() {
     const status = getSurveyStatus(survey);
     const optionsText = survey.options?.slice(0, 3).join(", ") + (survey.options?.length > 3 ? "..." : "") || "—";
     const period = [];
-    if (survey.startAt) period.push(`Inicio: ${formatDateTime(survey.startAt)}`);
-    if (survey.endAt) period.push(`Fin: ${formatDateTime(survey.endAt)}`);
+    if (survey.startAt) period.push(`Inicio: ${formatDate(survey.startAt)}`);
+    if (survey.endAt) period.push(`Fin: ${formatDate(survey.endAt)}`);
     const periodText = period.join(" · ") || "Sin fechas";
     const targetingText = getTargetingDisplay(survey);
     
