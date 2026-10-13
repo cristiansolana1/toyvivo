@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
+import { View, Text, Pressable, StyleSheet, ScrollView, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { User, sendEmailVerification } from "firebase/auth";
 import { useToast } from "../hooks/useToast";
@@ -49,6 +49,21 @@ export function VerifyEmailScreen({ user, onSignOut, onVerified }: VerifyEmailSc
     }
   };
 
+  const handleSignOutPress = () => {
+    Alert.alert(
+      "Cerrar sesión",
+      "¿Estás seguro de que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Cerrar sesión",
+          style: "destructive",
+          onPress: () => void onSignOut(),
+        },
+      ]
+    );
+  };
+
   return (
     <ScrollView
       style={styles.scrollContainer}
@@ -75,7 +90,7 @@ export function VerifyEmailScreen({ user, onSignOut, onVerified }: VerifyEmailSc
           <Text style={styles.secondaryButtonText}>{resending ? "Enviando..." : "Reenviar correo"}</Text>
         </Pressable>
 
-        <Pressable style={styles.linkButton} onPress={onSignOut}>
+        <Pressable style={styles.linkButton} onPress={handleSignOutPress}>
           <Text style={styles.linkButtonText}>Cerrar sesión</Text>
         </Pressable>
       </View>

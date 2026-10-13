@@ -1,4 +1,4 @@
-# Aviso de Vida ("Estoy Bien")
+# Estoy bien
 
 Aplicación móvil (React Native + Expo) y panel de administración web para compartir avisos de vida, monitorear la seguridad de contactos de confianza y recibir alertas en tiempo real.
 
@@ -8,7 +8,7 @@ Aplicación móvil (React Native + Expo) y panel de administración web para com
 
 - **Mobile**: React Native 0.86, Expo 57, TypeScript, React Navigation 7
 - **Backend & Base de Datos**: Firebase Auth, Firestore (offline-first), SecureStore / AsyncStorage
-- **Notificaciones Push**: `expo-notifications` (Canales nativos de Android con visibilidad en pantalla de bloqueo)
+- **Notificaciones Push**: `expo-notifications` (Canales nativos de Android con visibilidad en pantalla de bloqueo, recordatorios de 24h, notificaciones de solicitudes de contacto)
 - **Admin Panel**: Vanilla JS + Firebase SDK (ES Modules)
 - **Hosting**: Firebase Hosting (admin panel), EAS/Expo (builds móviles)
 
@@ -21,18 +21,22 @@ Aplicación móvil (React Native + Expo) y panel de administración web para com
   * Inicio de sesión y registro con selector segmentado (*Segmented Control*).
   * Soporte para autocompletado nativo y gestores de contraseñas de iOS y Android.
   * Verificación de correo electrónico y recuperación de contraseña.
+  * Confirmación de seguridad al cerrar sesión (`Alert.alert`).
 - **Perfil de Usuario**:
-  * Nombre completo, DNI, teléfono, fecha de nacimiento, país y provincia.
+  * Visualización del correo electrónico (no editable) junto al nombre completo, DNI, teléfono, fecha de nacimiento, país y provincia.
   * Almacenamiento seguro en documento privado (`users/{uid}/private/profile`).
-- - **Notificaciones Push e Interactivas (Pantalla de Bloqueo)**:
+  * Eliminación completa de cuenta con limpieza automática de Firestore (`users`, `userStatus`, `dniLookups`).
+- **Notificaciones Push e Interactivas (Pantalla de Bloqueo)**:
   * **Notificación Programada de 24 Horas:** Se activa cuando se cumplen exactamente 24 horas desde el último aviso.
   * **Acciones Rápidas:** Botón **"🟢 Estoy bien"** directamente en la notificación para avisar con un toque desde la pantalla bloqueada o barra de estado.
-  * **Notificación de Encuestas en Tiempo Real:** Escucha en tiempo real (`onSnapshot`) nuevas encuestas y alerta al usuario aun en segundo plano.
+  * **Notificación de Solicitudes de Contacto:** Alertas automáticas en tiempo real cuando un usuario solicita agregar al contacto como de seguridad.
+  * **Notificación de Encuestas en Tiempo Real:** Escucha en tiempo real (`onSnapshot`) nuevas encuestas y alerta al usuario aún en segundo plano.
   * **Canales con Visibilidad Pública (`PUBLIC`):** Muestra notificaciones completas sobre la pantalla bloqueada.
 - **Seguimiento de Contactos de Confianza**:
   * Alta de contactos mediante búsqueda puntual por DNI.
   * Aprobación explícita de solicitudes de contacto.
-  * Estado compartido en tiempo real (*Activo* vs. *Sin aviso*), acceso telefónico directo y WhatsApp.
+  * Contador preciso de contactos activos sincronizado con las tarjetas del panel persistente.
+  * Estado compartido en tiempo real (*Activo* vs. *Sin aviso* con formato de hora en 24h), acceso telefónico directo y WhatsApp.
   * Revocación de permisos en cualquier momento.
 - **Encuestas**: Responder encuestas geolocalizadas activas (una vez por usuario).
 
@@ -61,29 +65,29 @@ App/
 │   ├── types.ts            # Tipos de TypeScript
 │   ├── components/         # Componentes UI
 │   │   ├── HeartbeatButton.tsx
-│   │   ├── HeartbeatHistoryCard.tsx   # Tarjeta de racha de días e historial
-│   │   ├── WatchedUserCard.tsx        # Tarjeta de contacto monitoreado
-│   │   ├── ProfileEditor.tsx
+│   │   ├── WatchedUserCard.tsx        # Tarjeta de contacto monitoreado (tiempo 24h)
+│   │   ├── ProfileEditor.tsx          # Edición de perfil con correo no editable
 │   │   ├── SurveyCard.tsx
-│   │   ├── AddUserForm.tsx
+│   │   ├── AddUserForm.tsx            # Formulario de alta de DNI con ocultado de teclado
 │   │   └── ToastNotification.tsx
 │   ├── hooks/              # Custom Hooks
 │   │   ├── useAuth.ts
-│   │   ├── useHeartbeat.ts
-│   │   ├── useHeartbeatHistory.ts     # Hook para cálculo de racha e historial
-│   │   ├── useWatchedUsers.ts         # Sincronización estable de contactos
+│   │   ├── useHeartbeat.ts            # Sincronización y estado de cuenta regresiva
+│   │   ├── useWatchedUsers.ts         # Sincronización estable de contactos y conteo
+│   │   ├── useContactRequests.ts      # Solicitudes de contacto con notificaciones push
 │   │   ├── useSurvey.ts               # Listener en tiempo real para encuestas
 │   │   └── useProfile.ts
 │   ├── screens/            # Pantallas
-│   │   ├── AuthScreen.tsx             # Pantalla de login/registro con selector segmentado
-│   │   ├── HomeScreen.tsx             # Pantalla principal adaptable
-│   │   ├── VerifyEmailScreen.tsx
-│   │   └── ProfileSetupScreen.tsx
+│   │   ├── AuthScreen.tsx             # Pantalla de login/registro
+│   │   ├── HomeScreen.tsx             # Pantalla principal con banners de red offline/sync
+│   │   ├── VerifyEmailScreen.tsx      # Verificación de correo con confirmación de salida
+│   │   └── ProfileSetupScreen.tsx     # Alta inicial de datos personales
 │   └── services/           # Servicios de API y Firebase
-│       ├── heartbeatService.ts
+│       ├── authService.ts             # Autenticación y borrado completo de cuenta
+│       ├── heartbeatService.ts        # Persistencia local y remota de avisos de vida
 │       ├── notificationService.ts     # Gestión de canales, permisos y notificaciones
 │       ├── surveyService.ts
-│       └── userService.ts
+│       └── userService.ts             # Gestión de contactos, DNI y estados
 └── admin/                  # Panel de administración (Web estático)
     ├── index.html
     ├── app.js
@@ -112,6 +116,11 @@ Documento privado donde se almacenan datos sensibles (DNI, teléfono, fecha de n
 { status: "alive", createdAt: Timestamp, deviceCreatedAt: string }
 ```
 
+### `dniLookups/{dni}`
+```typescript
+{ uid: string }
+```
+
 ### `surveys/{surveyId}`
 ```typescript
 {
@@ -122,11 +131,6 @@ Documento privado donde se almacenan datos sensibles (DNI, teléfono, fecha de n
   targetProvince?: string,
   createdAt: Timestamp
 }
-```
-
-### `surveys/{surveyId}/responses/{uid}`
-```typescript
-{ answer: string, answeredAt: Timestamp }
 ```
 
 ---
@@ -178,4 +182,4 @@ npx expo start
 
 ## 📄 Licencia
 
-Privado - Uso interno de Aviso de Vida / Estoy Bien.
+Privado - Uso interno de Estoy Bien.

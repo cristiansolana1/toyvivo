@@ -163,7 +163,15 @@ export function subscribeToWatchedUsers(
     return onSnapshot(
       doc(db, "userStatus", uid),
       (docSnap) => {
-        if (!docSnap.exists()) return;
+        if (!docSnap.exists()) {
+          onUpdate({
+            uid,
+            fullName: "Usuario",
+            phone: "",
+            lastAliveAt: null,
+          });
+          return;
+        }
         const data = docSnap.data();
         onUpdate({
           uid: docSnap.id,

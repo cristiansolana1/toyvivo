@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useToast } from "../hooks/useToast";
-import { Keyboard, Linking, RefreshControl, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Keyboard, Linking, RefreshControl, Pressable, ScrollView, StyleSheet, Text, View, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 import { useWatchedUsers } from "../hooks/useWatchedUsers";
@@ -150,7 +150,18 @@ export function HomeScreen({
   }, [addWatchedUser, watchDni]);
 
   const handleSignOut = useCallback(() => {
-    void onSignOut();
+    Alert.alert(
+      "Cerrar sesión",
+      "¿Estás seguro de que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Cerrar sesión",
+          style: "destructive",
+          onPress: () => void onSignOut(),
+        },
+      ]
+    );
   }, [onSignOut]);
 
   return (

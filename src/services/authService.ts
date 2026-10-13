@@ -7,7 +7,8 @@ import {
 } from "firebase/auth";
 import { doc, writeBatch } from "firebase/firestore";
 import { auth, db } from "../firebase";
-import { clearUserData } from "../storage";
+import { loadLocalProfile, clearUserData } from "../storage";
+import { normalizeDNI } from "../utils/validation";
 
 export async function signIn(email: string, password: string): Promise<User> {
   const credential = await signInWithEmailAndPassword(auth, email, password);
@@ -35,10 +36,16 @@ export async function deleteUserAccount(uid: string): Promise<void> {
     throw new Error("UNAUTHENTICATED");
   }
 
+  const profile = await loadLocalProfile(uid);
+
   const batch = writeBatch(db);
   batch.delete(doc(db, "users", uid, "private", "profile"));
   batch.delete(doc(db, "users", uid));
   batch.delete(doc(db, "userStatus", uid));
+  if (profile?.dni) {
+    const normalizedDni = normalizeDNI(profile.dni);
+    batch.delete(doc(db, "dniLookups", normalizedDni));
+  }
   await batch.commit();
 
   await clearUserData(uid);

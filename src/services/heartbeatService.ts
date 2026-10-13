@@ -1,3 +1,8 @@
+/**
+ * Heartbeat service responsible for managing local persistence, Firestore synchronization,
+ * offline queueing, and authoritative server-timestamp reconciliation.
+ */
+
 import { doc, getDoc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { HeartbeatEntry } from "../types";
@@ -13,6 +18,9 @@ import {
 } from "../storage";
 import { hydrateUserProfile } from "./profileService";
 
+/**
+ * Persists a heartbeat entry to Firestore (user subcollection, user document, and public status).
+ */
 async function persistHeartbeat(uid: string, heartbeat: HeartbeatEntry): Promise<void> {
   const batch = writeBatch(db);
   const heartbeatRef = doc(db, "users", uid, "heartbeats", heartbeat.id);
@@ -50,6 +58,10 @@ async function persistHeartbeat(uid: string, heartbeat: HeartbeatEntry): Promise
   await batch.commit();
 }
 
+/**
+ * Sends a heartbeat: saves locally first, then attempts syncing to Firestore.
+ * Queues the heartbeat locally if offline or if the network request fails.
+ */
 export async function sendHeartbeat(uid: string, heartbeat: HeartbeatEntry): Promise<{ success: boolean; queued: boolean }> {
   await saveLocalHeartbeat(uid, heartbeat);
   
@@ -65,6 +77,9 @@ export async function sendHeartbeat(uid: string, heartbeat: HeartbeatEntry): Pro
   }
 }
 
+/**
+ * Synchronizes any pending offline heartbeats when network connectivity is restored.
+ */
 export async function syncPendingHeartbeats(uid: string): Promise<{ synced: number; failed: number }> {
   const pending = await getPendingHeartbeats(uid);
   if (pending.length === 0) return { synced: 0, failed: 0 };
@@ -91,6 +106,10 @@ export async function syncPendingHeartbeats(uid: string): Promise<{ synced: numb
   return { synced, failed };
 }
 
+/**
+ * Loads the last heartbeat timestamp, prioritizing Firestore server timestamps
+ * and reconciling local cache for consistency.
+ */
 export async function loadLastHeartbeat(uid: string): Promise<string | null> {
   let firestoreTimestamp: string | null = null;
 
