@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Animated, Image, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   User,
@@ -26,6 +26,16 @@ export default function App() {
   } = useProfile(user?.uid ?? null, user?.email);
   const [bootLoading, setBootLoading] = useState(true);
   const [bootError, setBootError] = useState<string | null>(null);
+
+  const [fadeAnim] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
 
   const handleSignOut = async () => {
     await signOut(auth);
@@ -79,16 +89,18 @@ export default function App() {
   if (bootLoading) {
     return (
       <SafeAreaProvider>
-        <View style={styles.container}>
-          <View style={styles.loaderWrap}>
+        <View style={styles.splashContainer}>
+          <Animated.View style={[styles.loaderWrap, { opacity: fadeAnim }]}>
             <Image
-              source={require("./assets/icon.png")}
+              source={require("./assets/splash-icon.png")}
               style={styles.logo}
               resizeMode="contain"
             />
-            <ActivityIndicator size="large" color="#286052" style={styles.spinner} />
-            <Text style={styles.subtitle}>Cargando aplicación...</Text>
-          </View>
+            <Text style={styles.brandTitle}>Estoy bien</Text>
+            <Text style={styles.tagline}>Cuidando de quienes te importan</Text>
+            <ActivityIndicator size="large" color="#fffdf8" style={styles.spinner} />
+            <Text style={styles.loadingText}>Cargando aplicación...</Text>
+          </Animated.View>
         </View>
       </SafeAreaProvider>
     );
@@ -116,15 +128,20 @@ export default function App() {
               }}
             />
           ) : profileLoading ? (
-            <View style={styles.loaderWrap}>
-              <Image
-                source={require("./assets/icon.png")}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-              <ActivityIndicator size="large" color="#286052" style={styles.spinner} />
-              <Text style={styles.subtitle}>Cargando tu perfil...</Text>
-            </View>
+            <SafeAreaProvider>
+              <View style={styles.splashContainer}>
+                <Animated.View style={[styles.loaderWrap, { opacity: fadeAnim }]}>
+                  <Image
+                    source={require("./assets/splash-icon.png")}
+                    style={styles.logo}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.brandTitle}>Estoy bien</Text>
+                  <ActivityIndicator size="large" color="#fffdf8" style={styles.spinner} />
+                  <Text style={styles.loadingText}>Cargando tu perfil...</Text>
+                </Animated.View>
+              </View>
+            </SafeAreaProvider>
           ) : !profile ? (
             <>
               {profileError ? <Text style={styles.errorText}>{profileError}</Text> : null}
@@ -155,20 +172,45 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8fafc",
   },
-  loaderWrap: {
+  splashContainer: {
     flex: 1,
+    backgroundColor: "#286052",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loaderWrap: {
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 24,
   },
   logo: {
-    width: 110,
-    height: 110,
-    borderRadius: 22,
-    marginBottom: 12,
+    width: 120,
+    height: 120,
+    borderRadius: 24,
+    marginBottom: 16,
+  },
+  brandTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#fffdf8",
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  tagline: {
+    fontSize: 14,
+    color: "#a3c4b9",
+    fontWeight: "600",
+    marginBottom: 24,
+    textAlign: "center",
   },
   spinner: {
-    marginVertical: 10,
+    marginVertical: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "rgba(255,253,248,0.8)",
+    marginTop: 6,
   },
   subtitle: {
     fontSize: 15,
