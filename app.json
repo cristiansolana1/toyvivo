@@ -23,8 +23,9 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "targetSdkVersion": 36,
       "predictiveBackGestureEnabled": false,
-      "package": "com.estoybien.toyvivo"
+      "package": "estoybien.goxs.com"
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -7,7 +7,7 @@ import {
 } from "firebase/auth";
 import { doc, writeBatch } from "firebase/firestore";
 import { auth, db } from "../firebase";
-import { loadLocalProfile, clearUserData } from "../storage";
+import { loadUserProfile as loadLocalProfile, clearUserData } from "../storage";
 import { normalizeDNI } from "../utils/validation";
 
 export async function signIn(email: string, password: string): Promise<User> {

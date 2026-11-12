@@ -1,7 +1,6 @@
 import {
   collection,
   doc,
-  documentId,
   getDoc,
   onSnapshot,
   query,
@@ -131,61 +130,25 @@ export type WatchedUserStatus = {
   lastAliveAt: string | null;
 };
 
-export function parseTimestampIso(value: any): string | null {
-  if (!value) return null;
-  try {
-    if (typeof value.toDate === "function") {
-      return value.toDate().toISOString();
-    }
-    if (value instanceof Date) {
-      return value.toISOString();
-    }
-    if (typeof value === "string") {
-      return value;
-    }
-    if (typeof value === "number") {
-      return new Date(value).toISOString();
-    }
-  } catch (err) {
-    console.warn("Error parsing timestamp:", err);
-  }
-  return null;
-}
-
 export function subscribeToWatchedUsers(
   userIds: string[],
   onUpdate: (user: WatchedUserStatus) => void,
-  onError?: (error: Error) => void
+  onError?: () => void
 ): () => void {
   if (userIds.length === 0) return () => {};
 
-  const unsubscribers = userIds.map((uid) => {
-    return onSnapshot(
-      doc(db, "userStatus", uid),
-      (docSnap) => {
-        if (!docSnap.exists()) {
-          onUpdate({
-            uid,
-            fullName: "Usuario",
-            phone: "",
-            lastAliveAt: null,
-          });
-          return;
-        }
-        const data = docSnap.data();
-        onUpdate({
-          uid: docSnap.id,
-          fullName: data.fullName ?? "Usuario",
-          phone: data.phone ?? "",
-          lastAliveAt: parseTimestampIso(data.lastAliveAt),
-        });
-      },
-      (error) => {
-        console.warn(`Error subscribing to userStatus for ${uid}:`, error);
-        if (onError) onError(error);
-      }
-    );
-  });
+  const unsubscribers = userIds.map((watchedUserId) =>
+    onSnapshot(doc(db, "userStatus", watchedUserId), (snapshot) => {
+      if (!snapshot.exists()) return;
+      const data = snapshot.data();
+      onUpdate({
+        uid: watchedUserId,
+        fullName: data.fullName ?? "Usuario",
+        phone: data.phone ?? "",
+        lastAliveAt: data.lastAliveAt?.toDate?.()?.toISOString?.() ?? null,
+      });
+    }, onError)
+  );
 
   return () => unsubscribers.forEach((unsub) => unsub());
 }

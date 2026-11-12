@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useToast } from "../hooks/useToast";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { UserProfile } from "../types";
 import { PROVINCES_AR, FIXED_COUNTRY, FIXED_COUNTRY_LABEL } from "../constants";
@@ -11,11 +10,9 @@ import { validateProfile, getFirstValidationError, normalizeDNI } from "../utils
 export function ProfileSetupScreen({
   onSaveProfile,
   saving,
-  email,
 }: {
   onSaveProfile: (profile: UserProfile) => Promise<void>;
   saving: boolean;
-  email?: string | null;
 }) {
   const [fullName, setFullName] = useState("");
   const [dni, setDni] = useState("");
@@ -24,7 +21,6 @@ export function ProfileSetupScreen({
   const [birthDateISO, setBirthDateISO] = useState("");
   const [birthDateDisplay, setBirthDateDisplay] = useState("");
   const { showToast } = useToast();
-  const insets = useSafeAreaInsets();
 
   const handleSave = async () => {
     const profile: UserProfile = {
@@ -67,22 +63,12 @@ export function ProfileSetupScreen({
   };
 
   return (
-    <ScrollView
-      keyboardShouldPersistTaps="handled"
-      style={styles.container}
-      contentContainerStyle={[styles.screen, { paddingBottom: Math.max(insets.bottom + 40, 60) }]}
-    >
+    <View style={styles.screen}>
       <Text style={styles.title}>Tus datos personales</Text>
       <Text style={styles.subtitle}>Solo se solicita una vez para activar tus avisos de seguridad.</Text>
 
       <View style={styles.sectionCard}>
         <Text style={styles.sectionTitle}>Información personal</Text>
-        {email ? (
-          <>
-            <Text style={styles.pickerLabel}>Correo electrónico (No editable)</Text>
-            <Text style={styles.fixedCountryText}>{email}</Text>
-          </>
-        ) : null}
         <TextInput style={styles.input} placeholder="Nombre completo" placeholderTextColor="#64748b" value={fullName} onChangeText={setFullName} />
         <TextInput
           style={styles.input}
@@ -138,16 +124,13 @@ export function ProfileSetupScreen({
       <Pressable style={styles.primaryButton} onPress={handleSave} disabled={saving}>
         <Text style={styles.primaryButtonText}>{saving ? "Guardando..." : "Guardar datos"}</Text>
       </Pressable>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#edf3ef",
-  },
   screen: {
+    backgroundColor: "#edf3ef",
     paddingHorizontal: 24,
     paddingVertical: 28,
   },
@@ -236,8 +219,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 4,
     marginBottom: 14,
-    minHeight: 48,
-    justifyContent: "center",
   },
   primaryButtonText: {
     color: "#fffdf8",

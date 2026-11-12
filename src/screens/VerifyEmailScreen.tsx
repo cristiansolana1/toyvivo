@@ -77,7 +77,7 @@ export function VerifyEmailScreen({ user, onSignOut, onVerified }: VerifyEmailSc
         <Text style={styles.title}>Verifica tu correo electrónico</Text>
         <Text style={styles.subtitle}>
           Hemos enviado un enlace de confirmación a <Text style={styles.bold}>{user.email}</Text>.
-          Por favor, abre tu correo y haz clic en el enlace para confirmar tus datos antes de continuar.
+          Por favor, abre tu correo(verificar Spam) y haz clic en el enlace para confirmar tus datos antes de continuar.
         </Text>
 
         {message ? <Text style={styles.message}>{message}</Text> : null}

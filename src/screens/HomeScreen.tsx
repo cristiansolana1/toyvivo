@@ -1,21 +1,19 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useToast } from "../hooks/useToast";
-import { Keyboard, Linking, RefreshControl, Pressable, ScrollView, StyleSheet, Text, View, Alert } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Alert, Linking, RefreshControl, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 import { useWatchedUsers } from "../hooks/useWatchedUsers";
 import { useContactRequests } from "../hooks/useContactRequests";
 import { useSurvey } from "../hooks/useSurvey";
 import { HeartbeatButton } from "../components/HeartbeatButton";
+import { WatchedUserCard } from "../components/WatchedUserCard";
 import { ProfileEditor } from "../components/ProfileEditor";
 import { SurveyCard } from "../components/SurveyCard";
-import { StatusHeader } from "../components/StatusHeader";
-import { ContactRequestsSection } from "../components/ContactRequestsSection";
-import { WatchedUsersSection } from "../components/WatchedUsersSection";
+import { AddUserForm } from "../components/AddUserForm";
+import { isHeartbeatOverdue, formatHeartbeatCountdown, FIXED_COUNTRY_LABEL, PROVINCES_AR } from "../constants";
 import { User } from "firebase/auth";
 import { UserProfile } from "../types";
-import { deleteUserAccount } from "../services/authService";
-import { requestNotificationPermissions } from "../services/notificationService";
 
 export function HomeScreen({
   user,
@@ -32,7 +30,6 @@ export function HomeScreen({
 }) {
   if (!user) return null;
   const currentProfile = profile;
-  const insets = useSafeAreaInsets();
 
   const {
     lastHeartbeat,
@@ -55,6 +52,7 @@ export function HomeScreen({
     watchMessage,
     addWatchedUser,
     removeWatchedUser,
+    setWatchMessage,
   } = useWatchedUsers(user.uid);
 
   const {
@@ -72,25 +70,26 @@ export function HomeScreen({
     surveyMessage,
     submittingSurvey,
     handleSurveySubmit,
-    loadSurvey,
   } = useSurvey(user.uid, currentProfile ?? undefined);
 
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [watchDni, setWatchDni] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    if (user?.uid) {
-      requestNotificationPermissions(user.uid);
-    }
-  }, [user?.uid]);
-
   const [entryError, setEntryError] = useState<string | null>(null);
   const { showToast } = useToast();
 
+  // Clear error when starting new operation
   const clearEntryError = useCallback(() => setEntryError(null), []);
 
-  const handleSaveProfile = useCallback(async (updatedProfile: UserProfile): Promise<boolean> => {
+  const sortedWatchedUsers = useMemo(() => {
+    return [...watchedUsers].sort((a, b) => {
+      const aMs = a.lastAliveAt ? new Date(a.lastAliveAt).getTime() : 0;
+      const bMs = b.lastAliveAt ? new Date(b.lastAliveAt).getTime() : 0;
+      return bMs - aMs;
+    });
+  }, [watchedUsers]);
+
+  const handleSaveProfile = async (updatedProfile: UserProfile): Promise<boolean> => {
     try {
       clearEntryError();
       await onSaveProfile(updatedProfile);
@@ -101,9 +100,20 @@ export function HomeScreen({
       setEntryError("Error al guardar: " + (error instanceof Error ? error.message : "Error desconocido"));
       return false;
     }
-  }, [clearEntryError, onSaveProfile]);
+  };
 
-  const callWatchedUser = useCallback(async (phone: string) => {
+  const handleShareApp = async () => {
+    try {
+      await Share.share({
+        message: "Te invito a usar Aviso de vida para compartir avisos y cuidar a tus contactos.",
+        title: "Invitar a Aviso de vida",
+      });
+    } catch {
+      Alert.alert("No disponible", "No se pudo abrir el menú para compartir.");
+    }
+  };
+
+  const callWatchedUser = async (phone: string) => {
     const sanitizedPhone = phone.replace(/[^0-9+]/g, "");
     if (!sanitizedPhone || sanitizedPhone.replace(/[^0-9]/g, "").length < 5) {
       showToast({ text: "Este usuario no tiene teléfono registrado.", type: "error" });
@@ -116,9 +126,9 @@ export function HomeScreen({
     } catch {
       showToast({ text: "No se pudo abrir la aplicación de llamadas.", type: "error" });
     }
-  }, [showToast]);
+  };
 
-  const messageWatchedUser = useCallback(async (phone: string) => {
+  const messageWatchedUser = async (phone: string) => {
     const digits = phone.replace(/\D/g, "");
     if (!digits || digits.length < 8) {
       showToast({ text: "Este usuario no tiene teléfono registrado.", type: "error" });
@@ -126,7 +136,7 @@ export function HomeScreen({
     }
 
     const whatsappNumber = digits.startsWith("54") ? digits : `54${digits.replace(/^0+/, "")}`;
-    const message = encodeURIComponent("Hola, te escribo desde la app Estoy bien.");
+    const message = encodeURIComponent("Hola, te escribo desde la app de Aviso de vida.");
     const appUrl = `whatsapp://send?phone=${whatsappNumber}&text=${message}`;
     const webUrl = `https://wa.me/${whatsappNumber}?text=${message}`;
 
@@ -137,94 +147,77 @@ export function HomeScreen({
     } catch {
       showToast({ text: "No se pudo abrir WhatsApp.", type: "error" });
     }
-  }, [showToast]);
-
-  const handleToggleProfileEditor = useCallback(() => {
-    setShowProfileEditor((prev) => !prev);
-  }, []);
-
-  const handleAddWatch = useCallback(async () => {
-    Keyboard.dismiss();
-    const ok = await addWatchedUser(watchDni);
-    if (ok) setWatchDni("");
-  }, [addWatchedUser, watchDni]);
-
-  const handleSignOut = useCallback(() => {
-    Alert.alert(
-      "Cerrar sesión",
-      "¿Estás seguro de que deseas cerrar sesión?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Cerrar sesión",
-          style: "destructive",
-          onPress: () => void onSignOut(),
-        },
-      ]
-    );
-  }, [onSignOut]);
+  };
 
   return (
     <ScrollView
-      style={styles.container}
-      keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={async () => {
-            setRefreshing(true);
-            try {
-              await Promise.all([
-                syncPending(),
-                loadSurvey(),
-              ]);
-              showToast({ text: "Datos actualizados correctamente.", type: "success" });
-            } catch {
-              showToast({ text: "Error al actualizar los datos.", type: "error" });
-            } finally {
-              setRefreshing(false);
-            }
-          }}
+          setRefreshing(true);
+          try {
+            await syncPending();
+            // The useWatchedUsers hook already subscribes to real-time updates,
+            // so watched users will update automatically.
+          } finally {
+            setRefreshing(false);
+          }
+        }}
         />
       }
-      contentContainerStyle={[styles.contentContainer, { paddingBottom: Math.max(insets.bottom + 32, 56) }]}>
-
-      <StatusHeader
-        fullName={profile?.fullName}
-        email={user?.email}
-        showProfileEditor={showProfileEditor}
-        onToggleProfileEditor={handleToggleProfileEditor}
-      />
-
-      {!isOnline && (
-        <View style={styles.offlineBanner}>
-          <Text style={styles.offlineBannerTitle}>Sin conexión a internet</Text>
-          <Text style={styles.offlineBannerText}>
-            Tus avisos se guardarán localmente y se sincronizarán automáticamente al reconectar.
-          </Text>
+      contentContainerStyle={styles.screen}>
+      <View style={styles.statusCard}>
+        <View>
+          <Text style={styles.statusLabel}>Estado actual</Text>
+          <Text style={styles.title}>Hola, {profile?.fullName ?? user?.email?.split("@")[0] ?? "Invitado"}</Text>
         </View>
-      )}
-
-      {sending && pendingCount > 0 && (
-        <View style={styles.syncBanner}>
-          <Text style={styles.syncBannerText}>
-            Sincronizando {pendingCount} aviso{pendingCount > 1 ? "s" : ""} pendiente{pendingCount > 1 ? "s" : ""}...
+        <Pressable style={styles.profileMenuButton} onPress={() => setShowProfileEditor((previous) => !previous)}>
+          <Text style={styles.profileMenuButtonText}>
+            {showProfileEditor ? "Ocultar" : "Editar"}
           </Text>
-        </View>
-      )}
-
+        </Pressable>
+      </View>
       {entryError && (
         <View style={styles.errorBanner}>
           <Text style={styles.errorBannerText}>{entryError}</Text>
         </View>
       )}
 
-      <ContactRequestsSection
-        requests={contactRequests}
-        error={contactRequestError}
-        respondingUid={respondingUid}
-        onRespond={respondToRequest}
-      />
+      {contactRequests.length > 0 ? (
+        <View style={styles.requestCard}>
+          <Text style={styles.requestTitle}>Solicitudes de contacto</Text>
+          <Text style={styles.requestDisclosure}>
+            Al aceptar, compartirás tu nombre, teléfono y último aviso con esa persona. Puedes revocar el acceso quitándola de Seguridad de tus contactos.
+          </Text>
+          {contactRequestError ? <Text style={styles.requestError}>{contactRequestError}</Text> : null}
+          {contactRequests.map((request) => (
+            <View key={request.requesterUid} style={styles.requestRow}>
+              <Text style={styles.requestName}>{request.requesterName}</Text>
+              <View style={styles.requestActions}>
+                <Pressable
+                  style={[styles.requestButton, styles.rejectButton]}
+                  onPress={() => void respondToRequest(request.requesterUid, false)}
+                  disabled={respondingUid === request.requesterUid}
+                  accessibilityLabel={`Rechazar solicitud de ${request.requesterName}`}
+                >
+                  <Text style={styles.rejectButtonText}>Rechazar</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.requestButton, styles.approveButton]}
+                  onPress={() => void respondToRequest(request.requesterUid, true)}
+                  disabled={respondingUid === request.requesterUid}
+                  accessibilityLabel={`Aprobar solicitud de ${request.requesterName}`}
+                >
+                  <Text style={styles.approveButtonText}>Aceptar</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : contactRequestError ? (
+        <Text style={styles.requestError}>{contactRequestError}</Text>
+      ) : null}
 
       {showProfileEditor && currentProfile?.fullName ? (
         <ProfileEditor
@@ -232,11 +225,6 @@ export function HomeScreen({
           onSave={handleSaveProfile}
           onCancel={() => setShowProfileEditor(false)}
           saving={saving}
-          email={user?.email}
-          onDelete={async () => {
-            await deleteUserAccount(user.uid);
-            await onSignOut();
-          }}
         />
       ) : null}
 
@@ -258,7 +246,7 @@ export function HomeScreen({
 
       <HeartbeatButton
         onPress={handleHeartbeat}
-        disabled={sending || loading || !overdue}
+        disabled={sending || !overdue}
         sending={sending}
         loading={loading}
         countdownText={countdownText}
@@ -267,35 +255,75 @@ export function HomeScreen({
         isOnline={isOnline}
       />
 
-      <WatchedUsersSection
-        watchingUserIds={watchingUserIds}
-        watchedUsers={watchedUsers}
-        addingWatch={addingWatch}
-        watchMessage={watchMessage}
-        watchDni={watchDni}
-        onChangeWatchDni={setWatchDni}
-        onAddWatch={handleAddWatch}
-        onCall={callWatchedUser}
-        onWhatsApp={messageWatchedUser}
-        onRemove={removeWatchedUser}
-        currentTime={currentTime}
+      <Text style={styles.sectionTitle}>Seguridad de tus contactos</Text>
+      <Text style={styles.counterText}>Contactos activos: {watchingUserIds.length}</Text>
+      <AddUserForm
+        value={watchDni}
+        onChangeText={setWatchDni}
+        onSubmit={() => addWatchedUser(watchDni)}
+        disabled={addingWatch}
+        message={watchMessage}
       />
 
-      <Pressable style={styles.logoutButton} onPress={handleSignOut}>
+      {sortedWatchedUsers.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateTitle}>Todavía no agregaste contactos</Text>
+          <Text style={styles.emptyStateText}>Agrega el DNI de una persona. Recibirá una solicitud y deberá aprobarla antes de compartir su estado y teléfono.</Text>
+        </View>
+      ) : (
+        sortedWatchedUsers.map((watchedUser) => (
+          <WatchedUserCard
+            key={watchedUser.uid}
+            user={watchedUser}
+            onCall={callWatchedUser}
+            onWhatsApp={messageWatchedUser}
+            onRemove={removeWatchedUser}
+            currentTime={currentTime}
+          />
+        ))
+      )}
+
+      <Pressable style={styles.logoutButton} onPress={() => void onSignOut()}>
         <Text style={styles.linkText}>Cerrar sesión</Text>
       </Pressable>
+      <View style={styles.bottomButtonsRow}>
+        <Pressable style={styles.shareButton} onPress={() => void handleShareApp()}>
+          <Text style={styles.shareButtonText}>📤 Invitar a compartir</Text>
+        </Pressable>
+        <Pressable style={styles.instagramButton} onPress={() => void Linking.openURL("https://www.instagram.com/estoybien.arg")}>
+          <Text style={styles.instagramButtonText}>📷 Seguir en Instagram</Text>
+        </Pressable>
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  screen: {
     backgroundColor: "#edf3ef",
-  },
-  contentContainer: {
     paddingHorizontal: 24,
     paddingVertical: 28,
+  },
+  statusCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  statusLabel: {
+    color: "#6e8279",
+    fontSize: 12,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#15231f",
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 15,
@@ -304,6 +332,47 @@ const styles = StyleSheet.create({
   },
   overdueText: {
     color: "#dc2626",
+    fontWeight: "700",
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0f172a",
+    marginBottom: 10,
+  },
+  counterText: {
+    fontSize: 14,
+    color: "#475569",
+    marginBottom: 10,
+  },
+  emptyState: {
+    backgroundColor: "#fffdf8",
+    borderWidth: 1,
+    borderColor: "#d5dfd8",
+    borderRadius: 14,
+    padding: 18,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#15231f",
+    marginBottom: 6,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: "#587068",
+    lineHeight: 20,
+  },
+  profileMenuButton: {
+    backgroundColor: "#286052",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  profileMenuButtonText: {
+    color: "#fffdf8",
     fontWeight: "700",
   },
   logoutButton: {
@@ -323,6 +392,47 @@ const styles = StyleSheet.create({
     color: "#9d4e30",
     fontWeight: "700",
   },
+  shareButton: {
+    alignSelf: "center",
+    marginTop: 28,
+    marginBottom: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#286052",
+    borderWidth: 1,
+    borderColor: "#1e4b40",
+    minWidth: 150,
+  },
+  shareButtonText: {
+    color: "#fffdf8",
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  bottomButtonsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 24,
+    marginBottom: 12,
+    flexWrap: "wrap",
+  },
+  instagramButton: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#fffdf8",
+    borderWidth: 1,
+    borderColor: "#d5dfd8",
+    minWidth: 150,
+  },
+  instagramButtonText: {
+    color: "#9d4e30",
+    fontWeight: "700",
+    fontSize: 14,
+    textAlign: "center",
+  },
   errorBanner: {
     backgroundColor: "#f8d7da",
     borderRadius: 8,
@@ -330,42 +440,74 @@ const styles = StyleSheet.create({
     borderColor: "#f5c6cb",
     padding: 12,
     marginBottom: 16,
+    color: "#842029",
+    fontSize: 14,
   },
   errorBannerText: {
     color: "#842029",
     fontWeight: "500",
   },
-  offlineBanner: {
-    backgroundColor: "#fef3c7",
+  requestCard: {
+    backgroundColor: "#fffdf8",
     borderWidth: 1,
-    borderColor: "#f59e0b",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
+    borderColor: "#d5dfd8",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 18,
   },
-  offlineBannerTitle: {
-    color: "#b45309",
-    fontSize: 14,
+  requestTitle: {
+    color: "#15231f",
+    fontSize: 16,
     fontWeight: "700",
-    marginBottom: 2,
+    marginBottom: 6,
   },
-  offlineBannerText: {
-    color: "#92400e",
+  requestDisclosure: {
+    color: "#587068",
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
+    marginBottom: 12,
   },
-  syncBanner: {
-    backgroundColor: "#dbeafe",
-    borderWidth: 1,
-    borderColor: "#3b82f6",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    alignItems: "center",
+  requestRow: {
+    borderTopWidth: 1,
+    borderTopColor: "#e1e8e3",
+    paddingTop: 12,
+    marginTop: 8,
   },
-  syncBannerText: {
-    color: "#1e40af",
-    fontSize: 14,
+  requestName: {
+    color: "#15231f",
+    fontSize: 15,
     fontWeight: "600",
+    marginBottom: 10,
+  },
+  requestActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  requestButton: {
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  rejectButton: {
+    backgroundColor: "#f1f5f2",
+    borderWidth: 1,
+    borderColor: "#cbd8cf",
+  },
+  rejectButtonText: {
+    color: "#38564b",
+    fontWeight: "600",
+  },
+  approveButton: {
+    backgroundColor: "#286052",
+  },
+  approveButtonText: {
+    color: "#fffdf8",
+    fontWeight: "700",
+  },
+  requestError: {
+    color: "#b91c1c",
+    fontSize: 13,
+    marginBottom: 8,
   },
 });

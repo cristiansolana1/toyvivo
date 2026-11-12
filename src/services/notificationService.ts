@@ -9,7 +9,8 @@ export const ACTION_ESTOY_BIEN_ID = "action_estoy_bien";
 if (Platform.OS !== "web") {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
     }),
@@ -107,6 +108,22 @@ export async function registerForPushTokenAsync(userId: string): Promise<string 
   return null;
 }
 
+export function registerPushTokenListener(userId: string): () => void {
+  if (Platform.OS === "web") return () => {};
+  const subscription = Notifications.addPushTokenListener((tokenData) => {
+    const token = tokenData.data;
+    if (token) {
+      const userRef = doc(db, "users", userId);
+      setDoc(userRef, { pushToken: token }, { merge: true }).catch((error) => {
+        console.warn("Error updating refreshed push token in Firestore:", error);
+      });
+    }
+  });
+  return () => {
+    subscription.remove();
+  };
+}
+
 export async function requestNotificationPermissions(userId?: string): Promise<boolean> {
   if (Platform.OS === "web") return false;
   try {
@@ -121,6 +138,7 @@ export async function requestNotificationPermissions(userId?: string): Promise<b
       await setupNotificationCategories();
       if (userId) {
         await registerForPushTokenAsync(userId);
+        registerPushTokenListener(userId);
       }
     }
     return finalStatus === "granted";
@@ -155,12 +173,11 @@ export async function scheduleHeartbeatReminders(lastHeartbeat: string | null): 
           body: "Han pasado 24 horas desde tu último aviso. Envía tu señal para que tus contactos sepan que estás bien.",
           data: { type: "heartbeat_available" },
           sound: true,
-          channelId: "heartbeat",
           categoryIdentifier: HEARTBEAT_CATEGORY_ID,
-          visibility: Notifications.AndroidNotificationVisibility.PUBLIC,
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          channelId: "heartbeat",
           seconds: secondsUntil24Hours,
           repeats: false,
         },
@@ -189,11 +206,9 @@ export async function sendHeartbeatAvailableNotification(): Promise<string | nul
         body: "Han pasado 24 horas desde tu último aviso. Envía tu señal para que tus contactos sepan que estás bien.",
         data: { type: "heartbeat_available" },
         sound: true,
-        channelId: "heartbeat",
         categoryIdentifier: HEARTBEAT_CATEGORY_ID,
-        visibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       },
-      trigger: null,
+      trigger: { channelId: "heartbeat" },
     });
     return notificationId;
   } catch (error) {
@@ -214,10 +229,8 @@ export async function sendSurveyNotification(
         body: question,
         data: { type: "new_survey", surveyId },
         sound: true,
-        channelId: "surveys",
-        visibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       },
-      trigger: null,
+      trigger: { channelId: "surveys" },
     });
     return notificationId;
   } catch (error) {
@@ -235,10 +248,8 @@ export async function sendContactRequestNotification(requesterName: string): Pro
         body: `${requesterName} quiere agregarte como contacto de seguridad.`,
         data: { type: "contact_request" },
         sound: true,
-        channelId: "heartbeat",
-        visibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       },
-      trigger: null,
+      trigger: { channelId: "heartbeat" },
     });
     return notificationId;
   } catch (error) {

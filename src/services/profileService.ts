@@ -20,15 +20,7 @@ export async function saveUserProfile(
   if (!/^\d{7,8}$/.test(normalizedProfile.dni)) throw new Error("INVALID_DNI");
 
   const dniLookupRef = doc(db, "dniLookups", normalizedProfile.dni);
-  const previousDni = previousProfile?.dni ? normalizeDNI(previousProfile.dni) : null;
-  const previousDniLookupRef =
-    previousDni && previousDni !== normalizedProfile.dni
-      ? doc(db, "dniLookups", previousDni)
-      : null;
-  const [existingDniLookup, previousDniLookup] = await Promise.all([
-    getDoc(dniLookupRef),
-    previousDniLookupRef ? getDoc(previousDniLookupRef) : Promise.resolve(null),
-  ]);
+  const existingDniLookup = await getDoc(dniLookupRef);
   if (existingDniLookup.exists() && existingDniLookup.data().uid !== uid) {
     throw new Error("DNI_ALREADY_REGISTERED");
   }
@@ -49,11 +41,14 @@ export async function saveUserProfile(
   }, { merge: true });
   batch.set(doc(db, "users", uid, "private", "profile"), normalizedProfile);
   if (
-    previousDniLookupRef &&
-    previousDniLookup?.exists() &&
-    previousDniLookup.data().uid === uid
+    previousProfile?.dni &&
+    normalizeDNI(previousProfile.dni) !== normalizedProfile.dni
   ) {
-    batch.delete(previousDniLookupRef);
+    const previousDniLookupRef = doc(db, "dniLookups", normalizeDNI(previousProfile.dni));
+    const previousDniLookup = await getDoc(previousDniLookupRef);
+    if (previousDniLookup.exists() && previousDniLookup.data().uid === uid) {
+      batch.delete(previousDniLookupRef);
+    }
   }
   batch.set(dniLookupRef, { uid });
   batch.set(doc(db, "userStatus", uid), {
@@ -74,6 +69,11 @@ export async function hydrateUserProfile(
 ): Promise<UserProfile | null> {
   const localProfile = await loadLocalProfile(uid);
   if (localProfile) {
+    try {
+      await saveUserProfile(uid, localProfile, email);
+    } catch {
+      // Keep the cached profile usable and retry cloud migration on a later startup.
+    }
     return localProfile;
   }
 
